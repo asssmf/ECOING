@@ -259,7 +259,7 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
 
 const ChaosToast = ({ data }) => (
   <div 
-    className={`fixed pointer-events-none font-black drop-shadow-lg z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
+    className={`fixed pointer-events-none font-black z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
     style={{ 
       left: data.x, 
       top: data.y, 
@@ -782,7 +782,8 @@ export default function App() {
          }
       }
       
-      t.life -= 0.015; // Slower fade for reading
+      // MOVED OUTSIDE ELSE: Always animate
+      t.life -= 0.015; 
     });
     state.current.toasts = state.current.toasts.filter(t => t.life > 0);
 
@@ -1015,11 +1016,15 @@ export default function App() {
       if (item.isBossItem) {
         let dmg = Math.max(1, 10 + buffs.bossDmgFlat); 
         
+        if (item.id === 'acid_vial') {
+           dmg = 1; // Force 1 damage for acid vials to prevent confusion
+        }
+
         if (Math.random() < buffs.critChance) {
            dmg *= 2;
-           addToast("CRIT!", "text-yellow-500", `${item.x}%`, "30%", 30);
+           addToast("CRIT!", "text-yellow-500", `${item.x}%`, "38%", 30);
         } else {
-           addToast(`-${dmg.toFixed(0)}`, "text-red-600", `${item.x}%`, "30%", 20);
+           addToast(`-${dmg.toFixed(0)}`, "text-red-600", `${item.x}%`, "38%", 20);
         }
         
         playSound('attack');
@@ -1028,7 +1033,7 @@ export default function App() {
         if (item.id === 'acid_vial') {
            const currentCount = state.current.inventory[item.id] || 0;
            state.current.inventory[item.id] = currentCount + 1;
-           addToast("ACID COLLECTED!", "text-lime-400", `${item.x}%`, "30%", 25, "-STATS");
+           addToast("ACID COLLECTED!", "text-lime-400", `${item.x}%`, "45%", 25, "-STATS");
            
            setUi(prev => ({ 
               ...prev, 
@@ -1084,66 +1089,58 @@ export default function App() {
            const bonusText = (profit - BASE_REWARD).toFixed(2);
            const itemRarityColor = safeRarity(item.rarity).text;
 
-           // POP UP SEQUENCE LOGIC
-           if (bonusText > 0 || collapseActive) {
-              const sequence = [];
-              const activeModifiers = []; 
+           // ALWAYS SHOW SEQUENCE IF PERKS ARE ACTIVE OR ALWAYS FOR UNIFORMITY
+           const sequence = [];
+           const activeModifiers = []; 
 
-              if (state.current.inventory['training'] > 0) activeModifiers.push({name: "TRAINING", rarity: 'common'});
+           if (state.current.inventory['training'] > 0) activeModifiers.push({name: "TRAINING", rarity: 'common'});
 
-              if (item.cat === CAT_RECYCLE && state.current.inventory['subsidy'] > 0) activeModifiers.push({name: "SUBSIDY", rarity: 'uncommon'});
-              if (item.cat === CAT_COMPOST && state.current.inventory['grant'] > 0) activeModifiers.push({name: "GRANT", rarity: 'uncommon'});
-              if (item.cat === CAT_TRASH && state.current.inventory['tax'] > 0) activeModifiers.push({name: "TAX CREDIT", rarity: 'uncommon'});
+           if (item.cat === CAT_RECYCLE && state.current.inventory['subsidy'] > 0) activeModifiers.push({name: "SUBSIDY", rarity: 'uncommon'});
+           if (item.cat === CAT_COMPOST && state.current.inventory['grant'] > 0) activeModifiers.push({name: "GRANT", rarity: 'uncommon'});
+           if (item.cat === CAT_TRASH && state.current.inventory['tax'] > 0) activeModifiers.push({name: "TAX CREDIT", rarity: 'uncommon'});
 
-              if (currentCount > 0) { 
-                 if (state.current.inventory['storage'] > 0) activeModifiers.push({name: "STORAGE", rarity: 'common'});
-                 if (state.current.inventory['efficiency'] > 0) activeModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
-              }
+           if (currentCount > 0) { 
+              if (state.current.inventory['storage'] > 0) activeModifiers.push({name: "STORAGE", rarity: 'common'});
+              if (state.current.inventory['efficiency'] > 0) activeModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
+           }
 
-              if (state.current.inventory['infra'] > 0) activeModifiers.push({name: "INFRA", rarity: 'legendary'});
-              if (state.current.inventory['combo'] > 0) activeModifiers.push({name: "CASH FLOW", rarity: 'uncommon'}); 
-              if (state.current.inventory['blood'] > 0) activeModifiers.push({name: "BLOOD", rarity: 'lunar'});
-              if (state.current.inventory['fragile'] > 0) activeModifiers.push({name: "FRAGILE", rarity: 'lunar'});
-              if (state.current.inventory['greed'] > 0) activeModifiers.push({name: "GREED", rarity: 'rare'});
-              if (state.current.inventory['void'] > 0) activeModifiers.push({name: "VOID", rarity: 'lunar'});
-              
-              activeModifiers.forEach(mod => {
-                 const modColor = safeRarity(mod.rarity).text;
-                 sequence.push({ text: mod.name, color: modColor, size: 18, delay: 20 + (activeModifiers.indexOf(mod) * 15) });
-              });
-              
-              let baseDelay = 20 + (activeModifiers.length * 15);
+           if (state.current.inventory['infra'] > 0) activeModifiers.push({name: "INFRA", rarity: 'legendary'});
+           if (state.current.inventory['combo'] > 0) activeModifiers.push({name: "CASH FLOW", rarity: 'uncommon'}); 
+           if (state.current.inventory['blood'] > 0) activeModifiers.push({name: "BLOOD", rarity: 'lunar'});
+           if (state.current.inventory['fragile'] > 0) activeModifiers.push({name: "FRAGILE", rarity: 'lunar'});
+           if (state.current.inventory['greed'] > 0) activeModifiers.push({name: "GREED", rarity: 'rare'});
+           if (state.current.inventory['void'] > 0) activeModifiers.push({name: "VOID", rarity: 'lunar'});
+           
+           if (state.current.inventory['mirror'] > 0) activeModifiers.push({name: "MIRROR", rarity: 'rare'});
+           if (state.current.inventory['acid_vial'] > 0) activeModifiers.push({name: "ACID", rarity: 'toxic'});
+           
+           activeModifiers.forEach(mod => {
+              const modColor = safeRarity(mod.rarity).text;
+              sequence.push({ text: mod.name, color: modColor, size: 18, delay: 20 + (activeModifiers.indexOf(mod) * 15) });
+           });
+           
+           let baseDelay = 20 + (activeModifiers.length * 15);
 
-              if (collapseActive) {
-                 if (collapseResult === 1) {
-                    sequence.push({ text: "MARKET BOOM", color: "text-purple-400", size: 14, delay: baseDelay });
-                    sequence.push({ text: "3X VALUE", color: "text-green-400", size: 20, delay: baseDelay + 20 });
-                    baseDelay += 40;
-                 } else {
-                    sequence.push({ text: "MARKET CRASH", color: "text-red-600", size: 14, delay: baseDelay });
-                    sequence.push({ text: "-4X VALUE", color: "text-red-500", size: 20, delay: baseDelay + 20 });
-                    baseDelay += 40;
-                 }
-              }
-              
-              // FINAL PROFIT POPUP
-              if (profit > 0) {
-                 sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: baseDelay + 15 });
-                 addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
+           if (collapseActive) {
+              if (collapseResult === 1) {
+                 sequence.push({ text: "MARKET BOOM", color: "text-purple-400", size: 14, delay: baseDelay });
+                 sequence.push({ text: "3X VALUE", color: "text-green-400", size: 20, delay: baseDelay + 20 });
+                 baseDelay += 40;
               } else {
-                 // If profit is negative (crash), we still show the sequence but end with red text
-                 sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, delay: baseDelay + 15 });
-                 addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
+                 sequence.push({ text: "MARKET CRASH", color: "text-red-600", size: 14, delay: baseDelay });
+                 sequence.push({ text: "-4X VALUE", color: "text-red-500", size: 20, delay: baseDelay + 20 });
+                 baseDelay += 40;
               }
-
+           }
+           
+           // FINAL PROFIT POPUP
+           if (profit > 0) {
+              sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: baseDelay + 15 });
+              addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
            } else {
-              // Simple Case (No perks active)
-              if (profit < 0) {
-                 addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 24);
-                 playSound('hit');
-              } else {
-                 addToast(`+$${profit.toFixed(2)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
-              }
+              // If profit is negative (crash), we still show the sequence but end with red text
+              sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, delay: baseDelay + 15 });
+              addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
            }
 
            state.current.money += profit;
