@@ -8,7 +8,7 @@ import {
   ZapOff, Vibration, FastForward, Ghost, Anchor, Book, Info,
   Flame, Droplets, Atom, Wind, Target, FileText, Battery,
   Smartphone, Monitor, Sliders, Volume1, Layout, Gem, Snowflake,
-  Home, LogOut, HelpCircle, Shield
+  Home, LogOut, HelpCircle, Shield, TrendingUp
 } from 'lucide-react';
 
 // --- GLOBAL SETTINGS ---
@@ -27,6 +27,7 @@ if (!window.ECO_SETTINGS) {
 
 // --- GAME CONSTANTS ---
 const STARTING_BANKRUPTCY_LIMIT = -200;
+const BANKRUPTCY_INCREASE_PER_WAVE = 30; 
 const BOSS_TIMER_DURATION = 90; 
 const BASE_REWARD = 5; 
 const STARTING_PENALTY = 10;
@@ -173,20 +174,19 @@ const PERK_DB = [
 
   { id: 'analyst', name: 'Market Analyst', icon: '📈', cat: CAT_RECYCLE, rarity: 'rare', price: 600, perk: '+5% Luck', type: 'luck', val: 0.05 },
   { id: 'insurance', name: 'Insurance Layer', icon: '☂️', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+1 Shield Block', type: 'flatShield', val: 1 },
-  { id: 'pressure', name: 'Boss Pressure', icon: '👺', cat: CAT_COMPOST, rarity: 'rare', price: 600, perk: '+10 Flat Boss Dmg', type: 'bossDmg', val: 10 },
+  { id: 'pressure', name: 'Boss Pressure', icon: '👺', cat: CAT_COMPOST, rarity: 'rare', price: 600, perk: '+10 Flat Boss Dmg', type: 'bossDmgFlat', val: 10 },
   { id: 'greed', name: 'Greed Protocol', icon: '💰', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+10% Cash, +10% Penalty', type: 'risk', val: 0.1 },
   { id: 'mirror', name: 'Broken Mirror', icon: '🪞', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+20% Luck, -10% Cash', type: 'tradeLuck', val: 0.2 },
 
   { id: 'infra', name: 'Golden Infra.', icon: '🏗️', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+15% Global Cash', type: 'globalCash', val: 0.15 },
   { id: 'efficiency', name: 'Supreme Eff.', icon: '⚡', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: '+10% Stack Speed', type: 'stackBonus', val: 0.1 },
   { id: 'precision', name: 'Precision Doc.', icon: '🎯', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+5% Crit Chance', type: 'crit', val: 0.05 },
-  { id: 'titan', name: 'Titan Contract', icon: '📜', cat: CAT_TRASH, rarity: 'legendary', price: 1500, perk: '+20 Flat Boss Dmg', type: 'bossDmg', val: 20 },
+  { id: 'titan', name: 'Titan Contract', icon: '📜', cat: CAT_TRASH, rarity: 'legendary', price: 1500, perk: '+20 Flat Boss Dmg', type: 'bossDmgFlat', val: 20 },
   { id: 'bailout', name: 'Corp. Bailout', icon: '🏦', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: 'Bankrupt Limit -100', type: 'bailout', val: 100 },
   { id: 'magnet', name: 'Magnetic Gloves', icon: '🧲', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: 'Hitbox +20%', type: 'hitbox', val: 0.2 },
 
   { id: 'blood', name: 'Blood Market', icon: '🩸', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+40% Cash, +40% Penalty', type: 'blood', val: 0.4 },
   { id: 'time', name: 'Time Collapse', icon: '⏳', cat: CAT_RECYCLE, rarity: 'lunar', price: 3000, perk: '-20% Fall Speed, +30% Spawn Rate', type: 'chaos', val: 0.2 },
-  { id: 'debt', name: 'Debt Is Power', icon: '💳', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+Cash when in Debt', type: 'debtPower', val: 0.1 },
   { id: 'awakening', name: 'Boss Awakening', icon: '👁️', cat: CAT_COMPOST, rarity: 'lunar', price: 3000, perk: 'Boss Reward x2, Boss HP +50%', type: 'bossRisk', val: 1 },
   { id: 'fragile', name: 'Fragile Wealth', icon: '💎', cat: CAT_RECYCLE, rarity: 'lunar', price: 3000, perk: 'Cash x2, Shields Disabled', type: 'glassCannon', val: 1 },
   { id: 'corrupt', name: 'Corrupted Luck', icon: '🎲', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+30% Luck, Commons Worth 0', type: 'corruptLuck', val: 0.3 },
@@ -194,7 +194,7 @@ const PERK_DB = [
 ];
 
 const HAZARD_ITEM = { id: 'hazard', name: 'TOXIC WASTE', icon: '☢️', cat: 'hazard', rarity: 'hazard' };
-const ACID_ITEM = { id: 'acid_vial', name: 'Acid Vial', icon: '🧪', cat: CAT_TRASH, rarity: 'toxic', perk: '-3% Cash, -1 Boss Dmg (DELETE TO CURE)', type: 'corrosive', val: 0.03 };
+const ACID_ITEM = { id: 'acid_vial', name: 'Acid Vial', icon: '🧪', cat: CAT_TRASH, rarity: 'toxic', perk: '-3% Cash, -5% Boss Dmg (DELETE TO CURE)', type: 'corrosive', val: 0.05 };
 
 const BOSS_ITEMS = [
   { id: 'boss_slime', name: 'Toxic Slime', icon: '🤮', cat: CAT_TRASH, rarity: 'common' },
@@ -224,12 +224,11 @@ const PERK_DESCRIPTIONS = {
     magnet: "Increases item hitbox size by 20%. Easier to click.",
     blood: "Huge +40% Cash boost, but +40% Penalty. Dangerous.",
     time: "Slows time by 20%, but spawns items 30% faster.",
-    debt: "The more debt you have, the more money you make.",
     awakening: "Bosses have +50% HP but give Double Rewards.",
     fragile: "Cash x2. Shields disabled. One miss hurts.",
     corrupt: "+30% Luck. Common items become worthless.",
     collapse: "Stack value x2. Lose 5% of total cash every minute.",
-    acid_vial: "TOXIC: Reduces Global Cash by 3% and Boss Damage by 1 per vial. Delete immediately."
+    acid_vial: "TOXIC: Reduces Global Cash by 3% and Boss Damage by 5% per vial. Delete immediately."
 };
 
 // --- COMPONENTS ---
@@ -288,6 +287,7 @@ export default function App() {
     money: 0,
     wave: 1,
     penalty: STARTING_PENALTY,
+    bankruptcyBase: STARTING_BANKRUPTCY_LIMIT, 
     bankruptcyLimit: STARTING_BANKRUPTCY_LIMIT,
     bossActive: false,
     bossHealth: 100,
@@ -306,8 +306,8 @@ export default function App() {
     binOrder: [CAT_RECYCLE, CAT_COMPOST, CAT_TRASH],
     glitchTimer: 0,
     freezerTimer: 0,
-    shield: 0, // NEW
-    maxShield: 0 // NEW
+    shield: 0, 
+    maxShield: 0 
   });
 
   const [ui, setUi] = useState({
@@ -366,7 +366,6 @@ export default function App() {
       critChance: 0,
       bailout: 0,
       spawnRateMul: 1,
-      debtPower: false,
       bossRisk: false,
       shieldsDisabled: false,
       commonNerf: false,
@@ -389,7 +388,6 @@ export default function App() {
             case 'catMod': b.catMod[perkItem.target] += (perkItem.val * count); break;
             case 'globalCash': b.globalCashMul += (perkItem.val * count); break;
             case 'luck': b.luckAdd += (perkItem.val * count); break;
-            case 'bossDmg': b.bossDmgMul += (perkItem.val * count); break; 
             case 'bossDmgFlat': b.bossDmgFlat += (perkItem.val * count); break; 
             case 'crit': b.critChance += (perkItem.val * count); break;
             case 'bailout': b.bailout += (perkItem.val * count); break;
@@ -397,7 +395,6 @@ export default function App() {
             case 'risk': b.globalCashMul += (0.1 * count); b.penaltyMul += (0.1 * count); break;
             case 'blood': b.globalCashMul += (0.4 * count); b.penaltyMul += (0.4 * count); break;
             case 'chaos': b.fallSpeedMul -= (0.2 * count); b.spawnRateMul += (0.3 * count); break;
-            case 'debtPower': b.debtPower = true; break;
             case 'bossRisk': b.bossRisk = true; break;
             case 'glassCannon': b.globalCashMul += (1.0 * count); b.shieldsDisabled = true; break;
             case 'corruptLuck': b.luckAdd += (0.3 * count); b.commonNerf = true; break;
@@ -405,7 +402,7 @@ export default function App() {
             case 'corrosive': 
                 b.acidDebuff += count; 
                 b.globalCashMul -= (0.03 * count); 
-                b.bossDmgFlat -= (1 * count); 
+                b.bossDmgMul -= (0.05 * count); 
                 break;
             default: break;
           }
@@ -415,7 +412,7 @@ export default function App() {
     
     b.fallSpeedMul = Math.max(0.2, b.fallSpeedMul);
     b.globalCashMul = Math.max(0.1, b.globalCashMul); 
-    b.bossDmgFlat = Math.max(0, b.bossDmgFlat);
+    b.bossDmgMul = Math.max(0, b.bossDmgMul);
     
     return b;
   };
@@ -457,6 +454,7 @@ export default function App() {
       money: startMoney,
       wave: 1,
       penalty: STARTING_PENALTY,
+      bankruptcyBase: startLimit,
       bankruptcyLimit: startLimit,
       items: [],
       inventory: {},
@@ -674,6 +672,10 @@ export default function App() {
     // 6. Physics
     const speedMult = state.current.bossDying ? 0.1 : 1.0;
 
+    // --- RECALCULATE LIMITS DYNAMICALLY ---
+    const effectiveLimit = state.current.bankruptcyBase - buffs.bailout;
+    state.current.bankruptcyLimit = effectiveLimit;
+
     state.current.items = state.current.items.filter(item => {
        if (item.isGambler) {
           item.gamblerTimer = (item.gamblerTimer || 0) + 1;
@@ -736,7 +738,7 @@ export default function App() {
       selectedUid: state.current.selectedUid,
       penalty: state.current.penalty,
       currentLuck: state.current.baseLuck + buffs.luckAdd,
-      bankruptcyLimit: STARTING_BANKRUPTCY_LIMIT - buffs.bailout,
+      bankruptcyLimit: effectiveLimit,
       shake: state.current.shake,
       bossTrait: state.current.bossTrait,
       bossDying: state.current.bossDying,
@@ -836,6 +838,10 @@ export default function App() {
     state.current.wave += 1;
     state.current.baseLuck += 0.1; 
     state.current.penalty += 5; 
+    
+    // THE CHANGE: Increase Bankruptcy Limit (Make it harder)
+    state.current.bankruptcyBase += BANKRUPTCY_INCREASE_PER_WAVE;
+
     state.current.items = [];
     state.current.bossMaxHealth = state.current.bossMaxHealth + 50; 
     state.current.glitchTimer = 0;
@@ -892,7 +898,8 @@ export default function App() {
     addToast(`-$${amount.toFixed(0)}`, "text-red-500", "50%", "50%", 30);
     playSound('hit');
     
-    const limit = state.current.bankruptcyLimit - buffs.bailout;
+    // Use stored/recalc limit
+    const limit = state.current.bankruptcyLimit;
 
     if (state.current.money <= limit) {
       state.current.gameOver = true;
@@ -911,7 +918,7 @@ export default function App() {
       playSound('explode');
       
       const buffs = getBuffs();
-      if (!ui.godMode && state.current.money <= state.current.bankruptcyLimit - buffs.bailout) {
+      if (!ui.godMode && state.current.money <= state.current.bankruptcyLimit) {
         state.current.gameOver = true;
         setUi(prev => ({ ...prev, gameOver: true }));
       }
@@ -934,7 +941,7 @@ export default function App() {
 
     if (item.cat === binCategory) {
       if (item.isBossItem) {
-        let dmg = 10 + buffs.bossDmgFlat; // FLAT DMG
+        let dmg = Math.max(1, (10 + buffs.bossDmgFlat) * buffs.bossDmgMul); 
         
         // Crit?
         if (Math.random() < buffs.critChance) {
@@ -987,10 +994,7 @@ export default function App() {
            // Apply Multipliers
            let profit = rawValue * buffs.catMod[item.cat] * buffs.globalCashMul;
            
-           if (buffs.debtPower && state.current.money < 0) {
-             const debtChunks = Math.floor(Math.abs(state.current.money) / 50);
-             profit *= (1 + (debtChunks * 0.1));
-           }
+           // REMOVED DEBT POWER LOGIC
 
            const bonusText = (profit - BASE_REWARD).toFixed(1);
            addToast(`+$${BASE_REWARD}`, "text-green-500", `${item.x}%`, `${item.y}%`, 24, bonusText > 0 ? `+$${bonusText} BONUS` : null);
@@ -1091,15 +1095,21 @@ export default function App() {
                </div>
             </div>
             
-            {/* Stats */}
-            <div className="flex gap-2">
-              <div className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200 flex items-center gap-1 shadow-sm">
-                 <Clover size={12} /> {ui.currentLuck.toFixed(1)}x
+            {/* Stats & LIMIT - HIDDEN ON BOSS FIGHT */}
+            {!ui.bossActive && (
+              <div className="flex gap-2">
+                <div className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200 flex items-center gap-1 shadow-sm">
+                   <Clover size={12} /> {ui.currentLuck.toFixed(1)}x
+                </div>
+                <div className="bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-red-200 flex items-center gap-1 shadow-sm">
+                   -{ui.penalty}
+                </div>
+                {/* NEW LIMIT BOX */}
+                <div className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 shadow-sm ${ui.bankruptcyLimit >= 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                   <TrendingUp size={12}/> LIMIT: {ui.bankruptcyLimit}
+                </div>
               </div>
-              <div className="bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-red-200 flex items-center gap-1 shadow-sm">
-                 {ui.godMode ? 'GOD' : `-${ui.penalty}`}
-              </div>
-            </div>
+            )}
             
             {/* SKIP BUTTON (CHEAT) */}
             {(ui.godMode || ui.spawnRateMult > 1) && (
@@ -1950,3 +1960,5 @@ export default function App() {
     </div>
   );
 }
+
+
