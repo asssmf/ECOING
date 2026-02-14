@@ -186,7 +186,8 @@ const PERK_DB = [
   { id: 'awakening', name: 'Boss Awakening', icon: '👁️', cat: CAT_COMPOST, rarity: 'lunar', price: 3000, perk: 'Boss Reward x2, Boss HP +50%', type: 'bossRisk', val: 1 },
   { id: 'fragile', name: 'Fragile Wealth', icon: '💎', cat: CAT_RECYCLE, rarity: 'lunar', price: 3000, perk: 'Cash x2, Shields Disabled', type: 'glassCannon', val: 1 },
   { id: 'corrupt', name: 'Corrupted Luck', icon: '🎲', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+30% Luck, Commons Worth 0', type: 'corruptLuck', val: 0.3 },
-  { id: 'collapse', name: 'Market Collapse', icon: '📉', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: 'Stack x2, Lose 5% Cash/min', type: 'collapse', val: 1 },
+  { id: 'collapse', name: 'Market Collapse', icon: '📉', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '30% Chance: 3x Profit OR -4x Loss', type: 'collapse', val: 1 },
+  { id: 'void', name: 'Void Prism', icon: '🔻', cat: CAT_COMPOST, rarity: 'lunar', price: 3000, perk: 'Stack Value x2, Global Cash -15%', type: 'void', val: 1 },
 ];
 
 const HAZARD_ITEM = { id: 'hazard', name: 'TOXIC WASTE', icon: '☢️', cat: 'hazard', rarity: 'hazard' };
@@ -223,7 +224,8 @@ const PERK_DESCRIPTIONS = {
     awakening: "Bosses have +50% HP but give Double Rewards.",
     fragile: "Cash x2. Shields disabled. One miss hurts.",
     corrupt: "+30% Luck. Common items become worthless.",
-    collapse: "Stack value x2. Lose 5% of total cash every minute.",
+    collapse: "VOLATILE: 30% Chance on sort to Gamble. If hit: 50% for 3x Profit, 50% for -4x Loss (Negative).",
+    void: "Doubles the value gained from stacking items, but reduces total cash flow by 15%.",
     acid_vial: "TOXIC: Reduces Global Cash by 3% and Boss Damage by 1 per vial."
 };
 
@@ -386,7 +388,7 @@ export default function App() {
             case 'baseReward': b.baseRewardMul += (perkItem.val * count); break;
             
             case 'stackBonus': stackAdditive += (perkItem.val * count); break;
-            case 'collapse': stackMultipliers *= Math.pow(2, count); break; 
+            // case 'collapse': stackMultipliers *= Math.pow(2, count); break; // REMOVED OLD LOGIC
             
             case 'catMod': b.catMod[perkItem.target] += (perkItem.val * count); break;
             
@@ -411,6 +413,12 @@ export default function App() {
             case 'chaos': b.fallSpeedMul -= (0.2 * count); b.spawnRateMul += (0.3 * count); break;
             case 'bossRisk': b.bossRisk = true; break;
             case 'corruptLuck': b.luckAdd += (0.3 * count); b.commonNerf = true; break;
+            
+            case 'void': 
+                stackMultipliers *= Math.pow(2, count); 
+                additiveGlobal -= (0.15 * count); 
+                break;
+
             default: break;
           }
         }
@@ -637,17 +645,7 @@ export default function App() {
 
     state.current.lastTime = time;
 
-    // --- MARKET COLLAPSE PENALTY ---
-    if (state.current.inventory['collapse'] > 0) {
-        state.current.collapseTimer++;
-        if (state.current.collapseTimer > 3600) { 
-            const drain = state.current.money * 0.05;
-            state.current.money -= drain;
-            addToast(`-$${drain.toFixed(2)}`, "text-red-900", "50%", "10%", 20, "MARKET COLLAPSE");
-            playSound('hit');
-            state.current.collapseTimer = 0;
-        }
-    }
+    // --- MARKET COLLAPSE PENALTY REMOVED (NEW LOGIC IN CLICK) ---
 
     // 1. Spawning
     if (!state.current.bossDying) {
@@ -1056,17 +1054,38 @@ export default function App() {
            let base = BASE_REWARD * buffs.baseRewardMul;
            let rarityBonus = RARITY[item.rarity].val;
            
-           if (buffs.commonNerf && item.rarity === 'common') rarityBonus *= 0.8;
+           if (buffs.commonNerf && item.rarity === 'common') {
+              base = 0;
+              rarityBonus = 0;
+           }
            
            // STACK LOGIC
            let rawValue = base + ((currentCount * rarityBonus) * buffs.stackMul);
            
            let profit = rawValue * buffs.catMod[item.cat] * buffs.globalCashMul;
            
+           let collapseActive = false;
+           let collapseResult = 0; // 0 = none, 1 = win, -1 = loss
+
+           // --- MARKET COLLAPSE NEW LOGIC ---
+           if (state.current.inventory['collapse'] > 0) {
+              if (Math.random() < 0.30) { // 30% Chance
+                 collapseActive = true;
+                 if (Math.random() < 0.50) { // 50% Win (3x)
+                    profit *= 3;
+                    collapseResult = 1;
+                 } else { // 50% Loss (-4x)
+                    profit *= -4;
+                    collapseResult = -1;
+                 }
+              }
+           }
+
            const bonusText = (profit - BASE_REWARD).toFixed(2);
            const itemRarityColor = safeRarity(item.rarity).text;
 
-           if (bonusText > 0) {
+           // POP UP SEQUENCE LOGIC
+           if (bonusText > 0 || collapseActive) {
               const sequence = [];
               const activeModifiers = []; 
 
@@ -1079,7 +1098,6 @@ export default function App() {
               if (currentCount > 0) { 
                  if (state.current.inventory['storage'] > 0) activeModifiers.push({name: "STORAGE", rarity: 'common'});
                  if (state.current.inventory['efficiency'] > 0) activeModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
-                 if (state.current.inventory['collapse'] > 0) activeModifiers.push({name: "COLLAPSE", rarity: 'lunar'});
               }
 
               if (state.current.inventory['infra'] > 0) activeModifiers.push({name: "INFRA", rarity: 'legendary'});
@@ -1087,21 +1105,51 @@ export default function App() {
               if (state.current.inventory['blood'] > 0) activeModifiers.push({name: "BLOOD", rarity: 'lunar'});
               if (state.current.inventory['fragile'] > 0) activeModifiers.push({name: "FRAGILE", rarity: 'lunar'});
               if (state.current.inventory['greed'] > 0) activeModifiers.push({name: "GREED", rarity: 'rare'});
+              if (state.current.inventory['void'] > 0) activeModifiers.push({name: "VOID", rarity: 'lunar'});
               
               activeModifiers.forEach(mod => {
                  const modColor = safeRarity(mod.rarity).text;
                  sequence.push({ text: mod.name, color: modColor, size: 18, delay: 20 + (activeModifiers.indexOf(mod) * 15) });
               });
               
-              sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: 20 + (activeModifiers.length * 15) + 15 });
+              let baseDelay = 20 + (activeModifiers.length * 15);
 
-              addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
+              if (collapseActive) {
+                 if (collapseResult === 1) {
+                    sequence.push({ text: "MARKET BOOM", color: "text-purple-400", size: 14, delay: baseDelay });
+                    sequence.push({ text: "3X VALUE", color: "text-green-400", size: 20, delay: baseDelay + 20 });
+                    baseDelay += 40;
+                 } else {
+                    sequence.push({ text: "MARKET CRASH", color: "text-red-600", size: 14, delay: baseDelay });
+                    sequence.push({ text: "-4X VALUE", color: "text-red-500", size: 20, delay: baseDelay + 20 });
+                    baseDelay += 40;
+                 }
+              }
+              
+              // FINAL PROFIT POPUP
+              if (profit > 0) {
+                 sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: baseDelay + 15 });
+                 addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
+              } else {
+                 // If profit is negative (crash), we still show the sequence but end with red text
+                 sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, delay: baseDelay + 15 });
+                 addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
+              }
+
            } else {
-              addToast(`+$${profit.toFixed(2)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
+              // Simple Case (No perks active)
+              if (profit < 0) {
+                 addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 24);
+                 playSound('hit');
+              } else {
+                 addToast(`+$${profit.toFixed(2)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
+              }
            }
 
            state.current.money += profit;
-           playSound('success');
+           
+           if (profit > 0) playSound('success');
+           else playSound('hit'); // Play hit sound on crash
         }
 
         setUi(prev => ({ 
@@ -1606,7 +1654,7 @@ export default function App() {
         {ui.menu === 'guide' && (
           <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col text-white overflow-hidden animate-slide-up">
             <div className="flex bg-slate-900 p-2 gap-2 overflow-x-auto shrink-0 border-b border-slate-800">
-              {['basics', 'economy', 'bestiary', 'hazards', 'perks', 'catalog'].map(tab => (
+              {['basics', 'economy', 'bestiary', 'hazards', 'perks', 'catalog', 'secrets'].map(tab => (
                 <button 
                   key={tab}
                   onClick={() => setUi(p=>({...p, guideTab: tab}))}
@@ -1617,7 +1665,7 @@ export default function App() {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 pb-20">
+            <div className="flex-1 overflow-y-auto p-6 pb-24">
               
               {ui.guideTab === 'basics' && (
                 <div className="space-y-6">
@@ -1663,7 +1711,7 @@ export default function App() {
 
                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
                       <h3 className="text-purple-400 font-bold mb-2 flex items-center gap-2"><Briefcase size={16}/> The Permit System</h3>
-                      <p className="text-xs text-slate-400 mb-4">Permits are passive upgrades found in the Shop after defeating a boss.</p>
+                      <p className="text-xs text-slate-400 mb-4">Permits are passive upgrades found in the Shop after defeating a boss. You can buy multiple of the same permit to stack effects.</p>
                       
                       <div className="space-y-3">
                         <div className="flex justify-between border-b border-slate-800 pb-2">
@@ -1684,6 +1732,16 @@ export default function App() {
                           <div className="text-right">
                             <div className="text-purple-400 text-xs font-mono">x1.5 - x2.0</div>
                             <div className="text-[10px] text-slate-500">Powerful</div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between pb-2">
+                          <div>
+                            <div className="text-white text-xs font-bold">Stacking</div>
+                            <div className="text-[10px] text-slate-500">Item Hoarding</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-blue-400 text-xs font-mono">Exponential</div>
+                            <div className="text-[10px] text-slate-500">Value increases with quantity</div>
                           </div>
                         </div>
                       </div>
@@ -1709,7 +1767,7 @@ export default function App() {
               {ui.guideTab === 'bestiary' && (
                 <div className="space-y-6">
                   <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">BESTIARY</h2>
-                  <p className="text-xs text-slate-400">Bosses appear every 90 seconds. Defeating them is the only way to access the Shop.</p>
+                  <p className="text-xs text-slate-400">Bosses appear every 90 seconds. Defeating them is the only way to access the Shop. Boss HP increases by +50 every wave.</p>
                   
                   <div className="space-y-4">
                     {[
@@ -1720,7 +1778,7 @@ export default function App() {
                       { name: 'Iron Clad', desc: 'Massive Armor (2x HP). Attacks are slow but heavy.', diff: 'Medium' },
                       { name: 'The Swarm', desc: 'Spawns 100s of low-speed items. Don\'t panic.', diff: 'Hard' },
                       { name: 'The Sniper', desc: 'Very few items, but they fall instantly. Reaction test.', diff: 'Extreme' },
-                      { name: 'Acidify', desc: 'Drops Acid Vials. If collected, they permanently debuff your stats until deleted from Inventory.', diff: 'Extreme' },
+                      { name: 'Acidify', desc: 'Drops Acid Vials. If collected, they permanently debuff your stats until deleted from Inventory. These vials reduce boss damage.', diff: 'Extreme' },
                       { name: 'Quantum Core', desc: 'Items teleport horizontally mid-air.', diff: 'Extreme' },
                       { name: 'The Gambler', desc: 'Items change shape and type while falling.', diff: 'Medium' },
                       { name: 'The Mimic', desc: 'Drops fake "Perk" items that are actually hazards. Check carefully.', diff: 'Hard' },
@@ -1776,6 +1834,38 @@ export default function App() {
                 </div>
               )}
 
+              {ui.guideTab === 'secrets' && (
+                 <div className="space-y-6 animate-fadeIn">
+                   <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-200">CLASSIFIED</h2>
+                   <div className="space-y-4">
+                      <div className="bg-slate-900 p-4 rounded-xl border border-purple-900/50">
+                        <h3 className="text-fuchsia-400 font-bold mb-2 flex items-center gap-2"><Eye size={16}/> Drop Rates</h3>
+                        <p className="text-xs text-slate-400 mb-2">Luck stats don't just increase rare drops—they aggressively decrease common drops.</p>
+                        <ul className="text-xs space-y-1 text-slate-500 font-mono">
+                           <li>Common Weight: 400 - (Luck * 10)</li>
+                           <li>Uncommon Weight: 50 * Luck</li>
+                           <li>Lunar Weight: 1 * Luck</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-slate-900 p-4 rounded-xl border border-purple-900/50">
+                        <h3 className="text-fuchsia-400 font-bold mb-2 flex items-center gap-2"><Shield size={16}/> Shield Math</h3>
+                        <p className="text-xs text-slate-400">Your max shield is calculated exactly: <strong>10 Items = 1 Shield Point</strong>. If you trash 10 items to clean your inventory, you lose 1 max shield capacity instantly.</p>
+                      </div>
+
+                      <div className="bg-slate-900 p-4 rounded-xl border border-purple-900/50">
+                        <h3 className="text-fuchsia-400 font-bold mb-2 flex items-center gap-2"><TrendingUp size={16}/> Debt Ceiling</h3>
+                        <p className="text-xs text-slate-400">The bank gives you more credit as you progress. Your Bankruptcy limit increases by <strong>$30</strong> every wave. Survive long enough, and you can go thousands into debt.</p>
+                      </div>
+
+                      <div className="bg-slate-900 p-4 rounded-xl border border-purple-900/50">
+                        <h3 className="text-fuchsia-400 font-bold mb-2 flex items-center gap-2"><Zap size={16}/> Chaos Mode</h3>
+                        <p className="text-xs text-slate-400">Chaos mode forces a flat <strong>2.0x Speed Multiplier</strong> on all items, stacking with other buffs. However, it also reduces spawn delays by 50%.</p>
+                      </div>
+                   </div>
+                 </div>
+              )}
+
             </div>
             
             <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="absolute bottom-6 left-6 right-6 bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg">BACK TO MENU</button>
@@ -1783,7 +1873,7 @@ export default function App() {
         )}
 
         {ui.menu === 'inventory' && (
-          <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 animate-slide-up">
+          <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 animate-slide-up text-slate-900">
             
             <div className="bg-white p-4 shadow-sm flex justify-between items-center z-10 sticky top-0">
               <div className="flex gap-4 items-center">
@@ -1844,7 +1934,7 @@ export default function App() {
             </div>
 
             {ui.inspectItem && (
-                 <div className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-6 border-t border-slate-100 animate-slide-up z-20">
+                 <div className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-6 border-t border-slate-100 animate-slide-up z-20 text-slate-900">
                    <div className="flex gap-4 mb-4">
                      <div className="bg-slate-50 w-20 h-20 rounded-2xl flex items-center justify-center text-5xl shrink-0 border border-slate-100 shadow-inner">
                        {ui.inspectItem.icon}
@@ -2007,4 +2097,5 @@ export default function App() {
     </div>
   );
 }
+
 
