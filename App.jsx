@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 // --- GLOBAL SETTINGS ---
-if (typeof window !== 'undefined' && !window.ECO_SETTINGS) {
+if (!window.ECO_SETTINGS) {
   window.ECO_SETTINGS = {
     masterVolume: 0.5,
     sfxVolume: 1.0,
@@ -34,7 +34,7 @@ const BASE_SHIELD_PER_ITEM = 0.1;
 
 // --- AUDIO ENGINE ---
 const playSound = (type) => {
-  if (typeof window === 'undefined' || window.ECO_SETTINGS.masterVolume <= 0) return;
+  if (window.ECO_SETTINGS.masterVolume <= 0) return;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -121,6 +121,7 @@ const RARITY = {
   hazard: { color: 'bg-red-900', text: 'text-red-500', val: 0, border: 'border-red-600', label: 'HAZARD', labelKey: 'hazard' },
 };
 
+// SAFETY WRAPPER FOR RARITY
 const safeRarity = (rarityKey) => {
   return RARITY[rarityKey] || RARITY.common;
 };
@@ -133,24 +134,29 @@ const WASTE_DB = [
   { id: 'shoe', name: 'Old Shoe', icon: '👟', cat: CAT_TRASH, rarity: 'common' },
   { id: 'egg', name: 'Egg Shell', icon: '🥚', cat: CAT_COMPOST, rarity: 'common' },
   { id: 'rag', name: 'Dirty Rag', icon: '🧣', cat: CAT_TRASH, rarity: 'common' },
+  
   { id: 'can', name: 'Aluminum Can', icon: '🥫', cat: CAT_RECYCLE, rarity: 'uncommon' },
   { id: 'banana', name: 'Banana Peel', icon: '🍌', cat: CAT_COMPOST, rarity: 'uncommon' },
   { id: 'foam', name: 'Styrofoam', icon: '☁️', cat: CAT_TRASH, rarity: 'uncommon' },
   { id: 'carton', name: 'Milk Carton', icon: '🥛', cat: CAT_RECYCLE, rarity: 'uncommon' },
   { id: 'spray', name: 'Spray Paint', icon: '🎨', cat: CAT_TRASH, rarity: 'uncommon' },
   { id: 'toy', name: 'Broken Toy', icon: '🧸', cat: CAT_TRASH, rarity: 'uncommon' },
+  
   { id: 'glass', name: 'Wine Bottle', icon: '🍾', cat: CAT_RECYCLE, rarity: 'rare' },
   { id: 'bones', name: 'Fish Bones', icon: '🐟', cat: CAT_COMPOST, rarity: 'rare' },
   { id: 'battery', name: 'Old Battery', icon: '🔋', cat: CAT_TRASH, rarity: 'rare' },
   { id: 'pizza', name: 'Pizza Box', icon: '🍕', cat: CAT_COMPOST, rarity: 'rare' },
   { id: 'smartwatch', name: 'Smart Watch', icon: '⌚', cat: CAT_RECYCLE, rarity: 'rare' },
+  
   { id: 'laptop', name: 'Old Laptop', icon: '💻', cat: CAT_RECYCLE, rarity: 'epic' },
   { id: 'steak', name: 'Aged Steak', icon: '🥩', cat: CAT_COMPOST, rarity: 'epic' },
   { id: 'toxin', name: 'Chem. Sludge', icon: '🧪', cat: CAT_TRASH, rarity: 'epic' },
   { id: 'fossil', name: 'Fossil', icon: '🦕', cat: CAT_COMPOST, rarity: 'epic' },
+  
   { id: 'goldbar', name: 'Gold Bar', icon: '🪙', cat: CAT_RECYCLE, rarity: 'legendary' },
   { id: 'meteor', name: 'Meteorite', icon: '☄️', cat: CAT_TRASH, rarity: 'legendary' },
   { id: 'ring', name: 'Diamond Ring', icon: '💍', cat: CAT_RECYCLE, rarity: 'legendary' },
+  
   { id: 'junk', name: 'Space Junk', icon: '🛰️', cat: CAT_TRASH, rarity: 'lunar' },
 ];
 
@@ -159,21 +165,25 @@ const PERK_DB = [
   { id: 'gloves', name: 'Safety Gloves', icon: '🛡️', cat: CAT_TRASH, rarity: 'common', price: 100, perk: '-$3 penalty', type: 'flatShield', val: 3 },
   { id: 'training', name: 'Value Training', icon: '📚', cat: CAT_COMPOST, rarity: 'common', price: 100, perk: '+5% base reward', type: 'baseReward', val: 0.05 },
   { id: 'storage', name: 'Storage Upgrade', icon: '📦', cat: CAT_TRASH, rarity: 'common', price: 100, perk: '+5% bonus cash', type: 'stackBonus', val: 0.05 },
+
   { id: 'subsidy', name: 'Recycling Subsidy', icon: '♻️', cat: CAT_RECYCLE, rarity: 'uncommon', price: 250, perk: '+10% Recycle val', type: 'catMod', target: CAT_RECYCLE, val: 0.1 },
   { id: 'grant', name: 'Compost Grant', icon: '🍂', cat: CAT_COMPOST, rarity: 'uncommon', price: 250, perk: '+10% Compost val', type: 'catMod', target: CAT_COMPOST, val: 0.1 },
   { id: 'tax', name: 'Waste Tax Credit', icon: '🗑️', cat: CAT_TRASH, rarity: 'uncommon', price: 250, perk: '+10% Trash val', type: 'catMod', target: CAT_TRASH, val: 0.1 },
   { id: 'combo', name: 'Combo Discipline', icon: '🥋', cat: CAT_RECYCLE, rarity: 'uncommon', price: 250, perk: '+5% Cash Flow', type: 'globalCash', val: 0.05 },
+
   { id: 'analyst', name: 'Market Analyst', icon: '📈', cat: CAT_RECYCLE, rarity: 'rare', price: 600, perk: '+5% Luck', type: 'luck', val: 0.05 },
   { id: 'insurance', name: 'Insurance Layer', icon: '☂️', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+1 Shield Block', type: 'flatShield', val: 1 },
   { id: 'pressure', name: 'Boss Pressure', icon: '👺', cat: CAT_COMPOST, rarity: 'rare', price: 600, perk: '+10 Flat Boss Dmg', type: 'bossDmg', val: 10 },
   { id: 'greed', name: 'Greed Protocol', icon: '💰', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+10% Cash, +10% Penalty', type: 'risk', val: 0.1 },
   { id: 'mirror', name: 'Broken Mirror', icon: '🪞', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+20% Luck, -10% Cash', type: 'tradeLuck', val: 0.2 },
+
   { id: 'infra', name: 'Golden Infra.', icon: '🏗️', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+15% Global Cash', type: 'globalCash', val: 0.15 },
   { id: 'efficiency', name: 'Supreme Eff.', icon: '⚡', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: '+10% Stack Speed', type: 'stackBonus', val: 0.1 },
   { id: 'precision', name: 'Precision Doc.', icon: '🎯', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+5% Crit Chance', type: 'crit', val: 0.05 },
   { id: 'titan', name: 'Titan Contract', icon: '📜', cat: CAT_TRASH, rarity: 'legendary', price: 1500, perk: '+20 Flat Boss Dmg', type: 'bossDmg', val: 20 },
   { id: 'bailout', name: 'Corp. Bailout', icon: '🏦', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: 'Bankrupt Limit -100', type: 'bailout', val: 100 },
   { id: 'magnet', name: 'Magnetic Gloves', icon: '🧲', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: 'Hitbox +20%', type: 'hitbox', val: 0.2 },
+
   { id: 'blood', name: 'Blood Market', icon: '🩸', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+40% Cash, +40% Penalty', type: 'blood', val: 0.4 },
   { id: 'time', name: 'Time Collapse', icon: '⏳', cat: CAT_RECYCLE, rarity: 'lunar', price: 3000, perk: '-20% Fall Speed, +30% Spawn Rate', type: 'chaos', val: 0.2 },
   { id: 'debt', name: 'Debt Is Power', icon: '💳', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+Cash when in Debt', type: 'debtPower', val: 0.1 },
@@ -268,7 +278,8 @@ const ChaosToast = ({ data }) => (
   </div>
 );
 
-// --- MAIN APP EXPORT ---
+// --- MAIN APP ---
+
 export default function App() {
   const state = useRef({
     spawnTimer: 0,
@@ -295,8 +306,8 @@ export default function App() {
     binOrder: [CAT_RECYCLE, CAT_COMPOST, CAT_TRASH],
     glitchTimer: 0,
     freezerTimer: 0,
-    shield: 0,
-    maxShield: 0
+    shield: 0, // NEW
+    maxShield: 0 // NEW
   });
 
   const [ui, setUi] = useState({
@@ -409,6 +420,7 @@ export default function App() {
     return b;
   };
 
+  // --- WEIGHTED RANDOM ---
   const getWeightedItem = (pool, luck) => {
     const poolWithWeights = pool.map(item => {
       let weight = 100;
@@ -430,6 +442,8 @@ export default function App() {
     }
     return pool[0].item;
   };
+
+  // --- Game Loop ---
 
   const startGame = () => {
     playSound('click');
@@ -550,7 +564,7 @@ export default function App() {
 
     const baseSpeed = state.current.bossActive ? 0.35 : 0.15;
     const waveMod = state.current.wave * 0.05; 
-    let chaosMult = (typeof window !== 'undefined' && window.ECO_SETTINGS.chaos) ? 2.0 : 1.0;
+    let chaosMult = window.ECO_SETTINGS.chaos ? 2.0 : 1.0;
 
     const finalSpeed = (baseSpeed + waveMod) * buffs.fallSpeedMul * variance * chaosMult;
 
@@ -581,15 +595,17 @@ export default function App() {
     state.current.lastTime = time;
     const buffs = getBuffs();
 
+    // 1. Spawning
     if (!state.current.bossDying) {
       state.current.spawnTimer++;
       let baseRate = state.current.bossActive ? 70 : 90;
       baseRate = Math.max(20, baseRate - (state.current.wave * 4)); 
       
+      // BOSS SPECIFIC RATES
       if (state.current.bossTrait === 'swarm') baseRate = 10; 
       if (state.current.bossTrait === 'sniper') baseRate = 120; 
       
-      let chaosRate = (typeof window !== 'undefined' && window.ECO_SETTINGS.chaos) ? 0.5 : 1.0;
+      let chaosRate = window.ECO_SETTINGS.chaos ? 0.5 : 1.0;
       let cheatRate = 1.0 / ui.spawnRateMult; 
 
       let finalRate = (baseRate / buffs.spawnRateMul) * chaosRate * cheatRate;
@@ -600,11 +616,13 @@ export default function App() {
       }
     }
 
+    // 2. Timers
     if (!state.current.bossActive && state.current.bossTimer > 0) {
       state.current.bossTimer -= 1/60; 
       if (state.current.bossTimer <= 0) startBoss(buffs);
     }
 
+    // 3. Glitch Boss Logic
     if (state.current.bossTrait === 'glitch' && !state.current.bossDying) {
         state.current.glitchTimer++;
         if (state.current.glitchTimer > 400 && state.current.glitchTimer < 500) {
@@ -620,6 +638,7 @@ export default function App() {
         }
     }
 
+    // 4. Quantum Boss Logic
     if (state.current.bossTrait === 'quantum' && !state.current.bossDying) {
        if (state.current.spawnTimer % 30 === 0 && state.current.items.length > 0) {
           const idx = Math.floor(Math.random() * state.current.items.length);
@@ -629,24 +648,30 @@ export default function App() {
        }
     }
 
+    // 5. Freezer Boss Logic (NERFED TO 1.05x)
     let freezeMult = 1.0;
     if (state.current.bossTrait === 'freezer' && !state.current.bossDying) {
         state.current.freezerTimer++;
         if (state.current.freezerTimer < 300) {
+           // Normal
         } else if (state.current.freezerTimer < 500) {
+           // Freeze
            freezeMult = 0;
            if (state.current.freezerTimer === 301) {
              addToast("FREEZE!", "text-cyan-200", "50%", "30%", 40);
              playSound('alarm');
            }
         } else {
+           // Shatter
            state.current.freezerTimer = 0;
            addToast("SHATTER!", "text-white", "50%", "50%", 50);
            playSound('explode');
+           // NERFED SPEED (1.05)
            state.current.items.forEach(i => i.speed *= 1.05); 
         }
     }
 
+    // 6. Physics
     const speedMult = state.current.bossDying ? 0.1 : 1.0;
 
     state.current.items = state.current.items.filter(item => {
@@ -685,13 +710,17 @@ export default function App() {
       return t.life > 0;
     });
 
-    if (typeof window !== 'undefined' && window.ECO_SETTINGS.ecoMode) {
+    // BATTERY SAVER (ECO MODE) SHAKE OVERRIDE
+    if (window.ECO_SETTINGS.ecoMode) {
       state.current.shake = 0;
     } else if (state.current.shake > 0) {
       state.current.shake *= 0.9;
     }
 
+    // --- RECALCULATE MAX SHIELD EACH FRAME (Dynamic based on inventory) ---
     const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
+    // Max shield = Items * 0.1
+    // We update max shield, but current shield only goes up via collecting or regen at start of wave
     const newMaxShield = totalItems * BASE_SHIELD_PER_ITEM; 
     state.current.maxShield = newMaxShield;
 
@@ -726,6 +755,8 @@ export default function App() {
   useEffect(() => {
     return () => cancelAnimationFrame(requestRef.current);
   }, []);
+
+  // --- Logic Helpers ---
 
   const setMenuState = (menuName) => {
     playSound('click');
@@ -810,6 +841,7 @@ export default function App() {
     state.current.glitchTimer = 0;
     state.current.freezerTimer = 0;
     
+    // REGEN SHIELD
     const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
     state.current.shield = totalItems * BASE_SHIELD_PER_ITEM;
 
@@ -840,13 +872,15 @@ export default function App() {
     
     const buffs = getBuffs();
 
+    // Check Shield First
     if (!buffs.shieldsDisabled && state.current.shield > 0) {
        if (state.current.shield >= amount) {
           state.current.shield -= amount;
           playSound('shieldHit');
           addToast("SHIELD BLOCKED", "text-blue-400", "50%", "50%", 20);
-          return;
+          return; // Blocked completely
        } else {
+          // Partial Block
           amount -= state.current.shield;
           state.current.shield = 0;
           playSound('shieldHit');
@@ -900,8 +934,9 @@ export default function App() {
 
     if (item.cat === binCategory) {
       if (item.isBossItem) {
-        let dmg = 10 + buffs.bossDmgFlat; 
+        let dmg = 10 + buffs.bossDmgFlat; // FLAT DMG
         
+        // Crit?
         if (Math.random() < buffs.critChance) {
            dmg *= 2;
            addToast("CRIT!", "text-yellow-500", `${item.x}%`, "30%", 30);
@@ -912,6 +947,7 @@ export default function App() {
         playSound('attack');
         state.current.bossHealth -= dmg;
         
+        // ACIDIFY BOSS LOGIC
         if (item.id === 'acid_vial') {
            const currentCount = state.current.inventory[item.id] || 0;
            state.current.inventory[item.id] = currentCount + 1;
@@ -930,6 +966,7 @@ export default function App() {
         const currentCount = state.current.inventory[item.id] || 0;
         state.current.inventory[item.id] = currentCount + 1;
         
+        // ADD SHIELD FOR COLLECTING ITEM
         if (!buffs.shieldsDisabled) {
            state.current.shield += BASE_SHIELD_PER_ITEM;
         }
@@ -938,13 +975,16 @@ export default function App() {
            addToast(`${item.name}`, "text-purple-400", "50%", "30%", 25, "UNLOCKED");
            playSound('success');
         } else {
+           // MULTIPLICATIVE CASH LOGIC
            let base = BASE_REWARD * buffs.baseRewardMul;
            let rarityBonus = RARITY[item.rarity].val;
            
            if (buffs.commonNerf && item.rarity === 'common') rarityBonus *= 0.8;
            
+           // Base + StackBonus
            let rawValue = base + ((currentCount * rarityBonus) * buffs.stackMul);
            
+           // Apply Multipliers
            let profit = rawValue * buffs.catMod[item.cat] * buffs.globalCashMul;
            
            if (buffs.debtPower && state.current.money < 0) {
@@ -980,11 +1020,13 @@ export default function App() {
     const count = state.current.inventory[itemId];
     if (count > 0) {
       state.current.inventory[itemId] = count - 1;
+      // REMOVE SHIELD ON DELETE
       state.current.shield = Math.max(0, state.current.shield - BASE_SHIELD_PER_ITEM);
       setUi(prev => ({ ...prev, inventory: { ...state.current.inventory } }));
     }
   };
 
+  // --- CHEAT ACTIONS ---
   const unlockAll = () => {
     const all = [...WASTE_DB, ...PERK_DB];
     all.forEach(i => {
@@ -999,6 +1041,8 @@ export default function App() {
     else startBoss(getBuffs());
   };
 
+  // --- RENDER ---
+
   const themeClass = window.ECO_SETTINGS.theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-b from-sky-100 to-white';
   const hudOrder = window.ECO_SETTINGS.leftHanded ? 'flex-row-reverse' : 'flex-row';
 
@@ -1009,35 +1053,55 @@ export default function App() {
         transform: `translate(${(Math.random() - 0.5) * ui.shake}px, ${(Math.random() - 0.5) * ui.shake}px)`
       }}
     >
+      
+      {/* 1. THE VOID: Static Black Background 
+        This is placed behind everything. If the shake moves the game container, 
+        this black layer ensures you never see the white browser body.
+      */}
       <div className="fixed inset-0 bg-black z-[-10]" />
+
+      {/* 2. THE GAME CONTAINER
+        This is what shakes. It contains the gradient background.
+      */}
       <div className={`relative w-full h-full max-w-lg mx-auto shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+
+        {/* 3. THE ATMOSPHERE: Expanded Background
+           This sits inside the Game Container but is sized at 300% to ensure edges are never visible.
+           -top-[100%] means it starts way above the viewport.
+        */}
         <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] z-0 ${themeClass}`} />
         
+        {/* === HUD === */}
         <div className={`absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-30 pointer-events-none ${hudOrder}`}>
           <div className="flex flex-col gap-2 pointer-events-auto">
+            {/* Money & Shield */}
             <div className={`px-4 py-2 rounded-xl shadow-lg border-2 flex flex-col transition-colors bg-white border-white ${ui.money < 0 ? 'border-red-400 bg-red-50' : ''}`}>
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex justify-between">
-                  <span>FUNDS</span>
-                  <span className="text-blue-500 flex items-center gap-1"><Shield size={10}/> {ui.shield.toFixed(1)}</span>
-                </span>
-                <div className={`flex items-center text-xl font-black ${ui.money < 0 ? 'text-red-600' : 'text-slate-800'}`}>
-                  <DollarSign size={18} strokeWidth={3} />
-                  {ui.money.toFixed(2)}
-                </div>
-                <div className="w-full h-1 bg-slate-100 mt-1 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 transition-all" style={{width: `${Math.min(100, (ui.shield / Math.max(1, ui.maxShield)) * 100)}%`}}></div>
-                </div>
+               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex justify-between">
+                 <span>FUNDS</span>
+                 <span className="text-blue-500 flex items-center gap-1"><Shield size={10}/> {ui.shield.toFixed(1)}</span>
+               </span>
+               <div className={`flex items-center text-xl font-black ${ui.money < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                 <DollarSign size={18} strokeWidth={3} />
+                 {ui.money.toFixed(2)}
+               </div>
+               
+               {/* Shield Bar */}
+               <div className="w-full h-1 bg-slate-100 mt-1 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 transition-all" style={{width: `${Math.min(100, (ui.shield / Math.max(1, ui.maxShield)) * 100)}%`}}></div>
+               </div>
             </div>
             
+            {/* Stats */}
             <div className="flex gap-2">
               <div className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200 flex items-center gap-1 shadow-sm">
-                  <Clover size={12} /> {ui.currentLuck.toFixed(1)}x
+                 <Clover size={12} /> {ui.currentLuck.toFixed(1)}x
               </div>
               <div className="bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-red-200 flex items-center gap-1 shadow-sm">
-                  {ui.godMode ? 'GOD' : `-${ui.penalty}`}
+                 {ui.godMode ? 'GOD' : `-${ui.penalty}`}
               </div>
             </div>
             
+            {/* SKIP BUTTON (CHEAT) */}
             {(ui.godMode || ui.spawnRateMult > 1) && (
               <button onClick={skipWave} className="bg-red-500 text-white font-black text-xs py-2 px-3 rounded shadow animate-pulse pointer-events-auto">
                 SKIP WAVE ⏭
@@ -1045,6 +1109,7 @@ export default function App() {
             )}
           </div>
 
+          {/* Timer / Boss Status */}
           {ui.menu === 'none' && (
             <div className={`px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg transition-all ${ui.bossActive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800/90 text-white'}`}>
               <Clock size={16} />
@@ -1077,6 +1142,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* === BOSS ALERT OVERLAY === */}
         {ui.bossActive && !ui.bossDying && ui.bossHealth === ui.bossMaxHealth && (
            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
              <div className="bg-red-600 text-white text-6xl font-black p-4 rotate-12 animate-pulse shadow-xl border-4 border-white">
@@ -1085,13 +1151,28 @@ export default function App() {
            </div>
         )}
 
+        {/* === BOSS BAR & NAME === */}
         {ui.bossActive && !ui.bossDying && (
           <div className="absolute top-24 left-6 right-6 z-20 animate-slide-down">
             <div className="flex justify-center mb-2">
                <div className="bg-red-900/90 text-white px-4 py-1 rounded-full font-black text-xs tracking-[0.2em] shadow-lg border border-red-500">
-                 {ui.bossTrait === 'none' ? 'TRASH TITAN' : ui.bossTrait.toUpperCase()}
-               </div>
-            </div>
+                 {(() => {
+                    let key = 'TRASH TITAN';
+                    if (ui.bossTrait === 'glitch') key = 'GLITCH PRIME';
+                    if (ui.bossTrait === 'rush') key = 'SPEED DEMON';
+                    if (ui.bossTrait === 'phantom') key = 'THE PHANTOM';
+                    if (ui.bossTrait === 'acid') key = 'ACIDIFY';
+                    if (ui.bossTrait === 'swarm') key = 'THE SWARM';
+                    if (ui.bossTrait === 'sniper') key = 'THE SNIPER';
+                    if (ui.bossTrait === 'quantum') key = 'QUANTUM CORE';
+                    if (ui.bossTrait === 'gambler') key = 'THE GAMBLER';
+                    if (ui.bossTrait === 'mimic') key = 'THE MIMIC';
+                    if (ui.bossTrait === 'freezer') key = 'ABSOLUTE ZERO';
+                    if (ui.bossTrait === 'iron') key = 'IRON CLAD';
+                    return key;
+                 })()}
+             </div>
+           </div>
             
             <div className="flex justify-between text-[10px] font-black text-red-800 mb-1 uppercase tracking-widest shadow-sm">
               <span>WAVE {ui.wave}</span>
@@ -1106,6 +1187,7 @@ export default function App() {
           </div>
         )}
 
+        {/* === BOSS DEATH OVERLAY === */}
         {ui.bossDying && (
           <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center animate-fadeIn">
              <div className="bg-emerald-500 text-white p-8 rounded-3xl shadow-2xl border-4 border-white transform scale-125 animate-bounce text-center">
@@ -1116,6 +1198,7 @@ export default function App() {
           </div>
         )}
 
+        {/* === GAME AREA === */}
         <div 
           className="absolute inset-0 z-10" 
           onPointerDown={() => {
@@ -1151,34 +1234,716 @@ export default function App() {
                `}>
                  {item.icon}
                </div>
+               {item.isPerkDrop && (
+                 <div className="bg-purple-600 text-white text-[9px] px-2 rounded-full -mt-2 z-10 font-bold uppercase tracking-wider shadow-sm">
+                   PERK
+                 </div>
+               )}
+               {item.isHazard && (
+                 <div className="bg-lime-600 text-white text-[9px] px-2 rounded-full -mt-2 z-10 font-bold uppercase tracking-wider shadow-sm">
+                   DANGER
+                 </div>
+               )}
              </div>
            ))}
         </div>
 
+        {/* CHAOS TOASTS */}
         {toasts.map(t => <ChaosToast key={t.id} data={t} />)}
 
+        {/* === BINS === */}
         <div className="absolute bottom-0 w-full flex gap-2 px-2 pb-2 z-20 transition-all duration-300">
           {ui.binOrder.map((cat, idx) => (
             <div key={idx} className="flex-1">
               <Bin 
                 category={cat} 
                 onClick={handleBinClick} 
-                isTarget={ui.selectedUid}
+                isTarget={state.current.selectedUid && ui.items.find(i=>i.uid===state.current.selectedUid)}
                 shake={ui.bossTrait === 'glitch'}
               />
             </div>
           ))}
         </div>
 
+        {/* === MENUS === */}
+
+        {/* START */}
         {ui.menu === 'start' && (
           <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 text-white animate-fadeIn">
             <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 mb-2">ECOING</h1>
+            <div className="text-slate-400 mb-8 font-mono tracking-widest text-xs flex gap-4">
+              <span>v22.5</span>
+              <span>VOID FIX</span>
+            </div>
+            
             <div className="flex flex-col gap-3 w-full max-w-xs">
-              <button onClick={startGame} className="bg-white text-slate-900 font-black text-lg py-4 rounded-xl shadow-xl flex items-center justify-center gap-2">
-                <Play fill="currentColor" size={20} /> PLAY
+              <div className="flex gap-2">
+                <button onClick={startGame} className="flex-1 bg-white text-slate-900 font-black text-lg py-4 rounded-xl shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
+                  <Play fill="currentColor" size={20} /> PLAY
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setUi(p=>({...p, menu: 'guide'}))} className="flex-1 bg-slate-800 text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-700 flex items-center justify-center gap-2">
+                  <BookOpen size={16}/> WIKI
+                </button>
+                <button onClick={() => setUi(p=>({...p, menu: 'settings'}))} className="flex-1 bg-slate-800 text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-700 flex items-center justify-center gap-2">
+                  <Settings size={16}/> CONFIG
+                </button>
+              </div>
+              
+              <button 
+                onClick={() => setUi(p=>({...p, menu: 'cheats'}))}
+                className="mt-4 text-[10px] text-slate-700 uppercase tracking-widest hover:text-slate-500 font-bold flex items-center justify-center gap-2"
+              >
+                <Terminal size={12} /> DEV CONSOLE
               </button>
             </div>
           </div>
+        )}
+
+        {/* PAUSE MENU */}
+        {ui.menu === 'paused' && (
+           <div className="absolute inset-0 bg-slate-900/90 z-50 flex flex-col items-center justify-center p-6 backdrop-blur">
+              <h2 className="text-4xl font-black text-white mb-8 tracking-widest">PAUSED</h2>
+              <div className="flex flex-col gap-4 w-full max-w-xs">
+                 <button onClick={() => setMenuState('none')} className="bg-emerald-500 text-white font-black py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                   <Play fill="currentColor" size={20} /> RESUME
+                 </button>
+                 <button onClick={startGame} className="bg-white text-slate-900 font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+                   <RotateCcw size={20} /> RESTART
+                 </button>
+                 <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="bg-slate-800 text-slate-300 font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+                   <Home size={20} /> MAIN MENU
+                 </button>
+              </div>
+           </div>
+        )}
+
+        {/* SETTINGS MENU */}
+        {ui.menu === 'settings' && (
+          <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col pt-6 px-6 text-white animate-slide-up">
+            <h2 className="text-3xl font-black mb-8 flex items-center gap-2 shrink-0"><Settings /> CONFIG</h2>
+            
+            <div className="flex-1 overflow-y-auto space-y-6">
+              
+              {/* VOLUME SECTION */}
+              <div className="space-y-2 shrink-0">
+                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Volume2 size={14}/> AUDIO SETTINGS</label>
+                <div className="bg-slate-800 p-4 rounded-xl space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Master Volume</span>
+                      <span>{Math.round(window.ECO_SETTINGS.masterVolume * 100)}%</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="1" step="0.1" 
+                      defaultValue={window.ECO_SETTINGS.masterVolume}
+                      onChange={(e) => {
+                        window.ECO_SETTINGS.masterVolume = parseFloat(e.target.value);
+                        setUi(p => ({...p, settingsKey: p.settingsKey + 1}));
+                      }}
+                      className="w-full accent-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* VISUALS SECTION */}
+              <div className="space-y-2 shrink-0">
+                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Monitor size={14}/> VISUAL SETTINGS</label>
+                <div className="bg-slate-800 rounded-xl overflow-hidden divide-y divide-slate-700">
+                  <button 
+                    onClick={() => {
+                      window.ECO_SETTINGS.theme = ui.darkMode ? 'light' : 'dark';
+                      setUi(p=>({...p, darkMode: !p.darkMode}));
+                    }}
+                    className="w-full p-4 flex justify-between items-center text-left"
+                  >
+                    <div>
+                      <span className="font-bold flex items-center gap-2"><Moon size={16}/> Night Theme</span>
+                      <span className="text-[10px] text-slate-400 block mt-1">Reduces eye strain.</span>
+                    </div>
+                    <span className={`text-xs font-bold ${ui.darkMode ? 'text-indigo-400' : 'text-slate-500'}`}>{ui.darkMode ? "ON" : "OFF"}</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      window.ECO_SETTINGS.ecoMode = !window.ECO_SETTINGS.ecoMode;
+                      setUi(p=>({...p, ecoMode: !p.ecoMode}));
+                    }}
+                    className="w-full p-4 flex justify-between items-center text-left"
+                  >
+                    <div>
+                      <span className="flex items-center gap-2"><Battery size={16}/> Battery Saver</span>
+                      <span className="text-[10px] text-slate-400 block mt-1">Disables particles & shake.</span>
+                    </div>
+                    <span className={`text-xs font-bold ${ui.ecoMode ? 'text-green-400' : 'text-slate-500'}`}>{ui.ecoMode ? "ON" : "OFF"}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      window.ECO_SETTINGS.particles = !window.ECO_SETTINGS.particles;
+                      setUi(p=>({...p, particles: !p.particles}));
+                    }}
+                    className="w-full p-4 flex justify-between items-center"
+                  >
+                    <span className="flex items-center gap-2"><Star size={16}/> Particles</span>
+                    <span className={`text-xs font-bold ${ui.particles ? 'text-cyan-400' : 'text-slate-500'}`}>{ui.particles ? "ON" : "OFF"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* GAMEPLAY SECTION */}
+              <div className="space-y-2 shrink-0">
+                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Sliders size={14}/> GAMEPLAY</label>
+                <div className="bg-slate-800 rounded-xl overflow-hidden divide-y divide-slate-700">
+                  <button 
+                    onClick={() => {
+                      window.ECO_SETTINGS.leftHanded = !ui.leftHanded;
+                      setUi(p=>({...p, leftHanded: !p.leftHanded}));
+                    }}
+                    className="w-full p-4 flex justify-between items-center text-left"
+                  >
+                    <div>
+                      <span className="flex items-center gap-2"><Layout size={16}/> Left-Handed Mode</span>
+                      <span className="text-[10px] text-slate-400 block mt-1">Moves buttons to left.</span>
+                    </div>
+                    <span className={`text-xs font-bold ${ui.leftHanded ? 'text-green-400' : 'text-slate-500'}`}>{ui.leftHanded ? "ON" : "OFF"}</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      window.ECO_SETTINGS.chaos = !window.ECO_SETTINGS.chaos;
+                      setUi(p=>({...p, chaosMode: !p.chaosMode}));
+                    }}
+                    className="w-full p-4 flex justify-between items-center text-left"
+                  >
+                    <div>
+                      <span className="flex items-center gap-2"><Radiation size={16}/> CHAOS MODE (2x Speed)</span>
+                      <span className={`text-xs font-bold ${ui.chaosMode ? 'text-red-400' : 'text-slate-500'}`}>{ui.chaosMode ? "ON" : "OFF"}</span>
+                    </div>
+                    <span className={`text-xs font-bold ${ui.chaosMode ? 'text-red-400' : 'text-slate-500'}`}>{ui.chaosMode ? "ON" : "OFF"}</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="py-6 shrink-0 mt-auto">
+              <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="w-full bg-white text-slate-900 font-black py-4 rounded-xl">BACK</button>
+            </div>
+          </div>
+        )}
+
+        {/* CHEATS MENU */}
+        {ui.menu === 'cheats' && (
+          <div className="absolute inset-0 bg-black z-50 flex flex-col p-6 text-green-400 font-mono animate-fadeIn overflow-y-auto">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 border-b border-green-800 pb-2 sticky top-0 bg-black z-10"><Terminal /> SANDBOX CONSOLE</h2>
+            
+            <div className="space-y-6 pb-20">
+              {/* TOGGLES */}
+              <div className="flex gap-2">
+                 <button 
+                   onClick={() => setUi(p=>({...p, godMode: !p.godMode}))}
+                   className={`flex-1 border-2 py-2 font-bold rounded ${ui.godMode ? 'bg-green-500 text-black border-green-500' : 'border-green-800 text-green-800'}`}
+                 >
+                   GOD MODE
+                 </button>
+                 <button 
+                   onClick={unlockAll}
+                   className="flex-1 border-2 border-green-500 py-2 font-bold rounded hover:bg-green-900/20"
+                 >
+                   UNLOCK ALL
+                 </button>
+              </div>
+
+              <div className="flex gap-2">
+                 <button 
+                   onClick={() => setUi(p=>({...p, perkRain: !p.perkRain}))}
+                   className={`flex-1 border-2 py-2 font-bold rounded ${ui.perkRain ? 'bg-purple-500 text-black border-purple-500' : 'border-purple-800 text-purple-800'}`}
+                 >
+                   PERK RAIN
+                 </button>
+              </div>
+
+              {/* INPUTS */}
+              <div>
+                <label className="text-xs uppercase opacity-70">Spawn Rate Multiplier (1x - 50x)</label>
+                <input 
+                  type="range" 
+                  min="1" max="50"
+                  value={ui.spawnRateMult}
+                  onChange={(e) => setUi(p=>({...p, spawnRateMult: parseInt(e.target.value)}))}
+                  className="w-full mt-2"
+                />
+                <div className="text-right text-sm">{ui.spawnRateMult}x</div>
+              </div>
+
+              <div>
+                <label className="text-xs uppercase opacity-70">Starting Money ($)</label>
+                <input 
+                  type="text" 
+                  value={ui.cheatMoney}
+                  onChange={(e) => setUi(p=>({...p, cheatMoney: e.target.value}))} // Allow raw text
+                  className="w-full bg-green-900/20 border border-green-700 rounded p-2 text-xl font-bold focus:outline-none focus:border-green-400"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs uppercase opacity-70">Base Luck Multiplier</label>
+                <input 
+                  type="text" 
+                  value={ui.cheatLuck}
+                  onChange={(e) => setUi(p=>({...p, cheatLuck: e.target.value}))}
+                  className="w-full bg-green-900/20 border border-green-700 rounded p-2 text-xl font-bold focus:outline-none focus:border-green-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs uppercase opacity-70">Boss Timer (Sec)</label>
+                <input 
+                  type="text" 
+                  value={ui.cheatBossTime}
+                  onChange={(e) => setUi(p=>({...p, cheatBossTime: e.target.value}))}
+                  className="w-full bg-green-900/20 border border-green-700 rounded p-2 text-xl font-bold focus:outline-none focus:border-green-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs uppercase opacity-70">Force Next Boss</label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {['random', 'glitch', 'rush', 'phantom', 'iron', 'acid', 'quantum', 'swarm', 'sniper', 'gambler', 'mimic', 'freezer'].map(t => (
+                    <button 
+                      key={t}
+                      onClick={() => setUi(p=>({...p, forceBoss: t}))}
+                      className={`flex-1 py-2 text-[10px] font-bold border ${ui.forceBoss === t ? 'bg-green-500 text-black border-green-500' : 'border-green-800 text-green-700'}`}
+                    >
+                      {t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="fixed bottom-0 left-0 w-full p-4 bg-black border-t border-green-900 flex gap-2">
+               <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="flex-1 bg-green-900/20 border border-green-800 py-4 font-bold text-green-700 rounded">
+                 BACK
+               </button>
+               <button onClick={() => { startGame(); playSound('success'); }} className="flex-[2] bg-green-500 text-black font-black py-4 rounded hover:bg-green-400">
+                 RUN SIMULATION
+               </button>
+            </div>
+          </div>
+        )}
+
+        {/* LUXURY WIKI */}
+        {ui.menu === 'guide' && (
+          <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col text-white overflow-hidden animate-slide-up">
+            {/* Nav */}
+            <div className="flex bg-slate-900 p-2 gap-2 overflow-x-auto shrink-0 border-b border-slate-800">
+              {['basics', 'economy', 'bestiary', 'hazards', 'perks', 'catalog'].map(tab => (
+                <button 
+                  key={tab}
+                  onClick={() => setUi(p=>({...p, guideTab: tab}))}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${ui.guideTab === tab ? 'bg-white text-slate-900' : 'text-slate-500 hover:bg-slate-800'}`}
+                >
+                  {tab.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 pb-20">
+              
+              {ui.guideTab === 'basics' && (
+                <div className="space-y-6">
+                  <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200">GAMEPLAY</h2>
+                  <div className="space-y-4 text-sm text-slate-300">
+                    <p className="leading-relaxed">Ecoing is a high-speed sorting simulator designed to test your reflexes and economic management. Your goal is to survive endless waves of waste, defeat anomaly bosses, and avoid bankruptcy.</p>
+                    
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <h3 className="text-white font-bold mb-2 flex items-center gap-2"><Target size={16}/> Core Mechanics</h3>
+                      <ul className="list-disc list-inside space-y-2 text-xs text-slate-400">
+                        <li><strong>Step 1:</strong> Tap falling items to <span className="text-yellow-400">SELECT</span> them. A yellow ring will appear.</li>
+                        <li><strong>Step 2:</strong> Tap the correct <span className="text-blue-400">BIN</span> below (Blue/Green/Gray) to sort.</li>
+                        <li><strong>Step 3:</strong> Correct sorts earn money. Wrong sorts or missed items drain your funds.</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <h3 className="text-white font-bold mb-2 flex items-center gap-2"><ShieldCheck size={16}/> Defense Systems</h3>
+                      <ul className="list-disc list-inside space-y-2 text-xs text-slate-400">
+                         <li><strong>Shield (Blue Bar):</strong> Absorbs penalty damage before it hits your cash.</li>
+                         <li><strong>Generation:</strong> Gain +0.1 Shield for every item in your Stash.</li>
+                         <li><strong>Regeneration:</strong> Shields fully restore at the start of every wave.</li>
+                         <li><strong>Risk:</strong> Deleting items permanently lowers your max shield.</li>
+                      </ul>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {ui.guideTab === 'economy' && (
+                <div className="space-y-6">
+                  <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-200">ECONOMY</h2>
+                  
+                  <div className="grid gap-4">
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-white font-bold">Base Income</h3>
+                        <span className="text-green-400 font-mono">$5.00</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">Basic trash (Bottles, Paper) has a flat value. It does not scale on its own. To increase your income, you must purchase upgrades.</p>
+                    </div>
+
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                      <h3 className="text-purple-400 font-bold mb-2 flex items-center gap-2"><Briefcase size={16}/> The Permit System</h3>
+                      <p className="text-xs text-slate-400 mb-4">Permits are passive upgrades found in the Shop after defeating a boss.</p>
+                      
+                      <div className="space-y-3">
+                        <div className="flex justify-between border-b border-slate-800 pb-2">
+                          <div>
+                            <div className="text-white text-xs font-bold">Subsidy / Grant</div>
+                            <div className="text-[10px] text-slate-500">Category Modifier</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-green-400 text-xs font-mono">+10%</div>
+                            <div className="text-[10px] text-slate-500">Linear Stack</div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-800 pb-2">
+                          <div>
+                            <div className="text-white text-xs font-bold">Global Cash</div>
+                            <div className="text-[10px] text-slate-500">Universal Multiplier</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-purple-400 text-xs font-mono">x1.5 - x2.0</div>
+                            <div className="text-[10px] text-slate-500">Powerful</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {ui.guideTab === 'perks' && (
+                <div className="space-y-6">
+                   <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-200">PERK DICTIONARY</h2>
+                   <div className="space-y-2">
+                      {Object.keys(PERK_DESCRIPTIONS).map(key => (
+                         <div key={key} className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                            <span className="text-white font-bold uppercase text-xs block mb-1">{key.replace('_', ' ')}</span>
+                            <span className="text-slate-400 text-xs">{PERK_DESCRIPTIONS[key]}</span>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+              )}
+
+              {ui.guideTab === 'bestiary' && (
+                <div className="space-y-6">
+                  <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">BESTIARY</h2>
+                  <p className="text-xs text-slate-400">Bosses appear every 90 seconds. Defeating them is the only way to access the Shop.</p>
+                  
+                  <div className="space-y-4">
+                    {[
+                      { name: 'Trash Titan', desc: 'The standard boss. High HP, balanced attacks.', diff: 'Easy' },
+                      { name: 'Glitch Prime', desc: 'Disrupts reality. Shuffles your bin positions randomly.', diff: 'Medium' },
+                      { name: 'Speed Demon', desc: 'Attacks at 2x speed. Requires rhythm.', diff: 'Hard' },
+                      { name: 'The Phantom', desc: 'Attacks flicker in and out of visibility.', diff: 'Hard' },
+                      { name: 'Iron Clad', desc: 'Massive Armor (2x HP). Attacks are slow but heavy.', diff: 'Medium' },
+                      { name: 'The Swarm', desc: 'Spawns 100s of low-speed items. Don\'t panic.', diff: 'Hard' },
+                      { name: 'The Sniper', desc: 'Very few items, but they fall instantly. Reaction test.', diff: 'Extreme' },
+                      { name: 'Acidify', desc: 'Drops Acid Vials. If collected, they permanently debuff your stats until deleted from Inventory.', diff: 'Extreme' },
+                      { name: 'Quantum Core', desc: 'Items teleport horizontally mid-air.', diff: 'Extreme' },
+                      { name: 'The Gambler', desc: 'Items change shape and type while falling.', diff: 'Medium' },
+                      { name: 'The Mimic', desc: 'Drops fake "Perk" items that are actually hazards. Check carefully.', diff: 'Hard' },
+                      { name: 'Absolute Zero', desc: 'Freezes time, stacking attacks, then releases all at once.', diff: 'Hard' },
+                    ].map(boss => (
+                      <div key={boss.name} className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                        <div className="flex justify-between items-center mb-1">
+                          <h3 className="font-black text-red-200">{boss.name.toUpperCase()}</h3>
+                          <span className="text-[10px] bg-red-950 text-red-500 px-2 py-0.5 rounded uppercase">{boss.diff}</span>
+                        </div>
+                        <p className="text-xs text-slate-400">{boss.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {ui.guideTab === 'hazards' && (
+                <div className="space-y-6">
+                  <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-emerald-200">HAZARDS</h2>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-slate-900 p-4 rounded-xl border-l-4 border-lime-500 flex gap-4">
+                      <div className="text-3xl">☢️</div>
+                      <div>
+                        <h3 className="font-bold text-lime-400 mb-1">Toxic Waste</h3>
+                        <p className="text-xs text-slate-300">A glowing green barrel. <strong>DO NOT CLICK.</strong> Let it hit the floor safely. Clicking causes an explosion (-$100).</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 p-4 rounded-xl border-l-4 border-yellow-500 flex gap-4">
+                      <div className="text-3xl">🧪</div>
+                      <div>
+                        <h3 className="font-bold text-yellow-400 mb-1">Acid Vials</h3>
+                        <p className="text-xs text-slate-300">Dropped by Acidify. Must be collected to damage the boss, but they linger in your inventory as a debuff (-3% Cash). <strong>DELETE</strong> them manually in the Resources tab after the fight.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {ui.guideTab === 'catalog' && (
+                <div className="space-y-6 animate-fadeIn">
+                  <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-200">ITEM DATABASE</h2>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[...WASTE_DB, ...PERK_DB].map(item => (
+                      <div key={item.id} className={`aspect-square bg-slate-900 rounded-xl flex flex-col items-center justify-center border ${(RARITY[item.rarity] || RARITY.common).border.replace('border-', 'border-opacity-50 border-')}`}>
+                        <div className="text-2xl mb-1">{item.icon}</div>
+                        <div className={`text-[8px] font-bold uppercase ${(RARITY[item.rarity] || RARITY.common).text}`}>{(RARITY[item.rarity] || RARITY.common).label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+            
+            <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="absolute bottom-6 left-6 right-6 bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg">BACK TO MENU</button>
+          </div>
+        )}
+
+        {/* INVENTORY */}
+        {ui.menu === 'inventory' && (
+          <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 animate-slide-up">
+            
+            <div className="bg-white p-4 shadow-sm flex justify-between items-center z-10 sticky top-0">
+              <div className="flex gap-4 items-center">
+                 <h2 className="text-xl font-black flex items-center gap-2"><Briefcase /> STASH</h2>
+                 <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+                   {/* FIXED: Resources is First */}
+                   <button 
+                     onClick={() => { playSound('click'); setUi(p=>({...p, invTab: 'waste', inspectItem: null})); }}
+                     className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${ui.invTab === 'waste' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                   >
+                     Resources
+                   </button>
+                   <button 
+                     onClick={() => { playSound('click'); setUi(p=>({...p, invTab: 'perks', inspectItem: null})); }}
+                     className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${ui.invTab === 'perks' ? 'bg-white shadow text-purple-700' : 'text-slate-500'}`}
+                   >
+                     Permits
+                   </button>
+                 </div>
+              </div>
+              <button onClick={() => setMenuState('none')} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200"><X size={20} /></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 pb-48">
+               <div className="grid grid-cols-4 gap-2 content-start">
+                  {Object.entries(ui.inventory).map(([id, count]) => {
+                    let item = WASTE_DB.find(i => i.id === id) || PERK_DB.find(i => i.id === id);
+                    if (id === 'acid_vial') item = ACID_ITEM; // Special check for acid
+                    
+                    if (!item || count <= 0) return null;
+                    
+                    // Acid Vial logic: It is NOT a perk for tab purposes, so it goes to Waste/Resource tab
+                    const isPerk = !!PERK_DB.find(i => i.id === id);
+                    if (ui.invTab === 'waste' && isPerk) return null;
+                    if (ui.invTab === 'perks' && !isPerk) return null;
+
+                    const rarity = safeRarity(item.rarity);
+                    const isSelected = ui.inspectItem?.id === id;
+                    
+                    // TOXIC ITEM GLOW
+                    const isToxic = item.rarity === 'toxic';
+
+                    return (
+                      <button 
+                        key={id} 
+                        onClick={() => { playSound('click'); setUi(p => ({...p, inspectItem: item})); }}
+                        className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center bg-white shadow-sm relative overflow-hidden transition-all 
+                        ${isSelected ? 'ring-2 ring-emerald-500 scale-95' : 'hover:bg-slate-50'} 
+                        ${rarity.border} ${isToxic ? 'animate-pulse bg-lime-50' : ''}`}
+                      >
+                        <div className={`absolute top-0 left-0 w-full h-1 ${rarity.color}`}></div>
+                        <div className="text-2xl">{item.icon}</div>
+                        <div className={`absolute bottom-1 right-1 text-[9px] font-black px-1.5 rounded-md ${rarity.color} ${rarity.text}`}>
+                          x{count}
+                        </div>
+                        {isToxic && <div className="absolute top-1 right-1"><AlertTriangle size={10} className="text-lime-600"/></div>}
+                      </button>
+                    );
+                  })}
+               </div>
+            </div>
+
+            {ui.inspectItem && (
+                 <div className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-6 border-t border-slate-100 animate-slide-up z-20">
+                   <div className="flex gap-4 mb-4">
+                     <div className="bg-slate-50 w-20 h-20 rounded-2xl flex items-center justify-center text-5xl shrink-0 border border-slate-100 shadow-inner">
+                       {ui.inspectItem.icon}
+                     </div>
+                     <div className="flex-1">
+                       <h3 className="font-bold text-xl leading-tight">{ui.inspectItem.name}</h3>
+                       <div className={`text-xs font-black uppercase mb-2 ${safeRarity(ui.inspectItem.rarity).text}`}>{safeRarity(ui.inspectItem.rarity).labelKey.toUpperCase()}</div>
+                       <p className="text-xs text-slate-500 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
+                         {ui.inspectItem.perk || PERK_DESCRIPTIONS[ui.inspectItem.id] || 'Standard collectible. Flat Value $5.'}
+                       </p>
+                     </div>
+                   </div>
+                   
+                   <div className="flex gap-2">
+                      <button 
+                        onClick={() => deleteItem(ui.inspectItem.id)}
+                        className="flex-1 bg-red-50 text-red-600 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 border border-red-100 active:scale-95 transition-transform"
+                      >
+                        <Trash size={16} /> TRASH IT
+                      </button>
+                      <button 
+                        onClick={() => { playSound('click'); setUi(p => ({...p, inspectItem: null})); }}
+                        className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+                      >
+                        CLOSE
+                      </button>
+                   </div>
+                 </div>
+            )}
+          </div>
+        )}
+
+        {/* RANDOM SHOP */}
+        {ui.shopOpen && (
+          <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col p-6 text-white animate-fadeIn">
+            <div className="flex justify-between items-center mb-1">
+              <h2 className="text-2xl font-black text-yellow-400">WAVE {ui.wave-1} CLEARED</h2>
+              <div className="font-mono text-xl text-green-400">${ui.money.toFixed(2)}</div>
+            </div>
+            
+            <p className="text-xs text-slate-400 mb-4">Buy Permits to scale your income. (Multi-buy OK)</p>
+
+            <div className="flex-1 space-y-3 overflow-y-auto pb-4">
+              {ui.shopSelection.map(item => {
+                 const isOwned = state.current.inventory[item.id] > 0;
+                 return (
+                  <button 
+                    key={item.id}
+                    onClick={() => {
+                      if (state.current.money >= item.price) {
+                        playSound('buy');
+                        state.current.money -= item.price;
+                        const count = state.current.inventory[item.id] || 0;
+                        state.current.inventory[item.id] = count + 1;
+                        
+                        setUi(prev => ({
+                            ...prev, 
+                            money: state.current.money,
+                            inventory: { ...state.current.inventory } 
+                        }));
+                      } else {
+                        playSound('hit');
+                      }
+                    }}
+                    disabled={ui.money < item.price}
+                    className="w-full bg-slate-800 p-3 rounded-xl flex items-center gap-3 border border-slate-700 disabled:opacity-50 active:scale-95 transition-all text-left relative overflow-hidden group"
+                  >
+                     {isOwned && <div className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>}
+                     <div className="bg-slate-700 w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0 border border-slate-600 group-disabled:opacity-50">{item.icon}</div>
+                     <div className="flex-1 min-w-0">
+                       <div className="font-bold text-sm truncate flex items-center gap-2">
+                         {item.name} 
+                         <span className={`text-[10px] uppercase px-1.5 rounded ${safeRarity(item.rarity).color} ${safeRarity(item.rarity).text}`}>{safeRarity(item.rarity).labelKey}</span>
+                       </div>
+                       <div className="text-xs text-slate-400 truncate opacity-80">{item.perk || PERK_DESCRIPTIONS[item.id]}</div>
+                     </div>
+                     <div className="text-green-400 font-mono font-bold text-sm flex flex-col items-end">
+                       <span>${item.price}</span>
+                       {isOwned && <span className="text-[9px] text-slate-500">x{state.current.inventory[item.id]}</span>}
+                     </div>
+                  </button>
+                 );
+              })}
+            </div>
+
+            <div className="flex gap-2 mt-2">
+              {ui.godMode && (
+                <button 
+                  onClick={skipWave}
+                  className="flex-1 bg-slate-700 text-slate-400 font-bold py-4 rounded-xl text-xs hover:bg-slate-600"
+                >
+                  SKIP (CHEAT)
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  playSound('click');
+                  state.current.lastTime = performance.now(); 
+                  state.current.shopOpen = false;
+                  setUi(p => ({...p, shopOpen: false}));
+                }}
+                className="flex-[2] bg-emerald-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-emerald-400 active:scale-95 transition-all"
+              >
+                START WAVE {ui.wave}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* GAME OVER */}
+        {ui.gameOver && (
+          <div className="absolute inset-0 bg-red-950/95 z-50 flex flex-col items-center justify-center p-8 backdrop-blur text-white animate-pulse-slow">
+             <Skull size={64} className="text-red-500 mb-4" />
+             <h2 className="text-5xl font-black mb-2 tracking-tighter">BANKRUPT</h2>
+             <p className="text-red-200 mb-8 font-mono text-sm">Debt Limit ({ui.bankruptcyLimit})</p>
+
+             <div className="bg-red-900/30 p-6 rounded-2xl w-full border border-red-800 mb-8 grid grid-cols-2 gap-4 text-center">
+               <div>
+                 <div className="text-[10px] uppercase text-red-400 font-bold">Wave Reached</div>
+                 <div className="text-3xl font-black">{ui.wave}</div>
+               </div>
+               <div>
+                 <div className="text-[10px] uppercase text-red-400 font-bold">Items Kept</div>
+                 <div className="text-3xl font-black">{Object.values(ui.inventory).reduce((a,b)=>a+b, 0)}</div>
+               </div>
+             </div>
+
+             <div className="flex gap-2 w-full">
+               <button onClick={startGame} className="flex-1 bg-white text-red-900 font-black text-xl py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">
+                 <RotateCcw size={20} /> TRY AGAIN
+               </button>
+               <button onClick={() => setUi(p=>({...p, gameOver: false, menu: 'start'}))} className="bg-red-900 border border-red-700 text-red-200 font-bold px-4 rounded-xl active:scale-95">
+                 MENU
+               </button>
+             </div>
+          </div>
+        )}
+
+        {/* BOSS NAME BADGE */}
+        {ui.bossActive && !ui.bossDying && (
+           <div className="absolute top-24 left-6 right-6 z-20 animate-slide-down flex justify-center mb-2 pointer-events-none">
+             <div className="bg-red-900/90 text-white px-4 py-1 rounded-full font-black text-xs tracking-[0.2em] shadow-lg border border-red-500">
+                 {(() => {
+                    let key = 'TRASH TITAN';
+                    if (ui.bossTrait === 'glitch') key = 'GLITCH PRIME';
+                    if (ui.bossTrait === 'rush') key = 'SPEED DEMON';
+                    if (ui.bossTrait === 'phantom') key = 'THE PHANTOM';
+                    if (ui.bossTrait === 'acid') key = 'ACIDIFY';
+                    if (ui.bossTrait === 'swarm') key = 'THE SWARM';
+                    if (ui.bossTrait === 'sniper') key = 'THE SNIPER';
+                    if (ui.bossTrait === 'quantum') key = 'QUANTUM CORE';
+                    if (ui.bossTrait === 'gambler') key = 'THE GAMBLER';
+                    if (ui.bossTrait === 'mimic') key = 'THE MIMIC';
+                    if (ui.bossTrait === 'freezer') key = 'ABSOLUTE ZERO';
+                    if (ui.bossTrait === 'iron') key = 'IRON CLAD';
+                    return key;
+                 })()}
+             </div>
+           </div>
         )}
 
       </div>
