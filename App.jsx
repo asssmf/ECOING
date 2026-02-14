@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Recycle, Trash2, Leaf, Play, RotateCcw, X, Briefcase, 
   Clock, DollarSign, AlertTriangle, Clover, Zap, ShoppingBag, 
@@ -8,7 +8,7 @@ import {
   ZapOff, Vibration, FastForward, Ghost, Anchor, Book, Info,
   Flame, Droplets, Atom, Wind, Target, FileText, Battery,
   Smartphone, Monitor, Sliders, Volume1, Layout, Gem, Snowflake,
-  Home, LogOut, HelpCircle, Shield, TrendingUp
+  Home, LogOut, HelpCircle, Shield, TrendingUp, BarChart3, RefreshCw
 } from 'lucide-react';
 
 // --- GLOBAL SETTINGS ---
@@ -32,6 +32,7 @@ const BOSS_TIMER_DURATION = 90;
 const BASE_REWARD = 5; 
 const STARTING_PENALTY = 10;
 const BASE_SHIELD_PER_ITEM = 0.1;
+const SHOP_REROLL_COST = 50;
 
 // --- AUDIO ENGINE ---
 const playSound = (type) => {
@@ -68,7 +69,7 @@ const playSound = (type) => {
     else if (type === 'success') { 
       osc.type = 'sine'; osc.frequency.setValueAtTime(800, now);
       osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
-      gainNode.gain.setValueAtTime(0.1 * vol, now); gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      gainNode.gain.setValueAtTime(0.4 * vol, now); gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
       osc.start(now); osc.stop(now + 0.3);
     }
     else if (type === 'hit') { 
@@ -102,6 +103,13 @@ const playSound = (type) => {
       gainNode.gain.setValueAtTime(0.3 * vol, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
       osc.start(now); osc.stop(now + 1.0);
     }
+    else if (type === 'pop') { 
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now);
+      // LOUD POP
+      gainNode.gain.setValueAtTime(0.9 * vol, now); 
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now); osc.stop(now + 0.1);
+    }
   } catch (e) {}
 };
 
@@ -122,10 +130,7 @@ const RARITY = {
   hazard: { color: 'bg-red-900', text: 'text-red-500', val: 0, border: 'border-red-600', label: 'HAZARD', labelKey: 'hazard' },
 };
 
-// SAFETY WRAPPER FOR RARITY
-const safeRarity = (rarityKey) => {
-  return RARITY[rarityKey] || RARITY.common;
-};
+const safeRarity = (rarityKey) => RARITY[rarityKey] || RARITY.common;
 
 const WASTE_DB = [
   { id: 'bottle', name: 'Plastic Bottle', icon: '🥤', cat: CAT_RECYCLE, rarity: 'common' },
@@ -135,29 +140,24 @@ const WASTE_DB = [
   { id: 'shoe', name: 'Old Shoe', icon: '👟', cat: CAT_TRASH, rarity: 'common' },
   { id: 'egg', name: 'Egg Shell', icon: '🥚', cat: CAT_COMPOST, rarity: 'common' },
   { id: 'rag', name: 'Dirty Rag', icon: '🧣', cat: CAT_TRASH, rarity: 'common' },
-  
   { id: 'can', name: 'Aluminum Can', icon: '🥫', cat: CAT_RECYCLE, rarity: 'uncommon' },
   { id: 'banana', name: 'Banana Peel', icon: '🍌', cat: CAT_COMPOST, rarity: 'uncommon' },
   { id: 'foam', name: 'Styrofoam', icon: '☁️', cat: CAT_TRASH, rarity: 'uncommon' },
   { id: 'carton', name: 'Milk Carton', icon: '🥛', cat: CAT_RECYCLE, rarity: 'uncommon' },
   { id: 'spray', name: 'Spray Paint', icon: '🎨', cat: CAT_TRASH, rarity: 'uncommon' },
   { id: 'toy', name: 'Broken Toy', icon: '🧸', cat: CAT_TRASH, rarity: 'uncommon' },
-  
   { id: 'glass', name: 'Wine Bottle', icon: '🍾', cat: CAT_RECYCLE, rarity: 'rare' },
   { id: 'bones', name: 'Fish Bones', icon: '🐟', cat: CAT_COMPOST, rarity: 'rare' },
   { id: 'battery', name: 'Old Battery', icon: '🔋', cat: CAT_TRASH, rarity: 'rare' },
   { id: 'pizza', name: 'Pizza Box', icon: '🍕', cat: CAT_COMPOST, rarity: 'rare' },
   { id: 'smartwatch', name: 'Smart Watch', icon: '⌚', cat: CAT_RECYCLE, rarity: 'rare' },
-  
   { id: 'laptop', name: 'Old Laptop', icon: '💻', cat: CAT_RECYCLE, rarity: 'epic' },
   { id: 'steak', name: 'Aged Steak', icon: '🥩', cat: CAT_COMPOST, rarity: 'epic' },
   { id: 'toxin', name: 'Chem. Sludge', icon: '🧪', cat: CAT_TRASH, rarity: 'epic' },
   { id: 'fossil', name: 'Fossil', icon: '🦕', cat: CAT_COMPOST, rarity: 'epic' },
-  
   { id: 'goldbar', name: 'Gold Bar', icon: '🪙', cat: CAT_RECYCLE, rarity: 'legendary' },
   { id: 'meteor', name: 'Meteorite', icon: '☄️', cat: CAT_TRASH, rarity: 'legendary' },
   { id: 'ring', name: 'Diamond Ring', icon: '💍', cat: CAT_RECYCLE, rarity: 'legendary' },
-  
   { id: 'junk', name: 'Space Junk', icon: '🛰️', cat: CAT_TRASH, rarity: 'lunar' },
 ];
 
@@ -166,25 +166,21 @@ const PERK_DB = [
   { id: 'gloves', name: 'Safety Gloves', icon: '🛡️', cat: CAT_TRASH, rarity: 'common', price: 100, perk: '-$3 penalty', type: 'flatShield', val: 3 },
   { id: 'training', name: 'Value Training', icon: '📚', cat: CAT_COMPOST, rarity: 'common', price: 100, perk: '+5% base reward', type: 'baseReward', val: 0.05 },
   { id: 'storage', name: 'Storage Upgrade', icon: '📦', cat: CAT_TRASH, rarity: 'common', price: 100, perk: '+5% bonus cash', type: 'stackBonus', val: 0.05 },
-
   { id: 'subsidy', name: 'Recycling Subsidy', icon: '♻️', cat: CAT_RECYCLE, rarity: 'uncommon', price: 250, perk: '+10% Recycle val', type: 'catMod', target: CAT_RECYCLE, val: 0.1 },
   { id: 'grant', name: 'Compost Grant', icon: '🍂', cat: CAT_COMPOST, rarity: 'uncommon', price: 250, perk: '+10% Compost val', type: 'catMod', target: CAT_COMPOST, val: 0.1 },
   { id: 'tax', name: 'Waste Tax Credit', icon: '🗑️', cat: CAT_TRASH, rarity: 'uncommon', price: 250, perk: '+10% Trash val', type: 'catMod', target: CAT_TRASH, val: 0.1 },
   { id: 'combo', name: 'Combo Discipline', icon: '🥋', cat: CAT_RECYCLE, rarity: 'uncommon', price: 250, perk: '+5% Cash Flow', type: 'globalCash', val: 0.05 },
-
   { id: 'analyst', name: 'Market Analyst', icon: '📈', cat: CAT_RECYCLE, rarity: 'rare', price: 600, perk: '+5% Luck', type: 'luck', val: 0.05 },
   { id: 'insurance', name: 'Insurance Layer', icon: '☂️', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+1 Shield Block', type: 'flatShield', val: 1 },
-  { id: 'pressure', name: 'Boss Pressure', icon: '👺', cat: CAT_COMPOST, rarity: 'rare', price: 600, perk: '+10 Flat Boss Dmg', type: 'bossDmgFlat', val: 10 },
+  { id: 'pressure', name: 'Boss Pressure', icon: '👺', cat: CAT_COMPOST, rarity: 'rare', price: 600, perk: '+10 Flat Boss Dmg', type: 'bossDmg', val: 10 },
   { id: 'greed', name: 'Greed Protocol', icon: '💰', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+10% Cash, +10% Penalty', type: 'risk', val: 0.1 },
   { id: 'mirror', name: 'Broken Mirror', icon: '🪞', cat: CAT_TRASH, rarity: 'rare', price: 600, perk: '+20% Luck, -10% Cash', type: 'tradeLuck', val: 0.2 },
-
   { id: 'infra', name: 'Golden Infra.', icon: '🏗️', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+15% Global Cash', type: 'globalCash', val: 0.15 },
   { id: 'efficiency', name: 'Supreme Eff.', icon: '⚡', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: '+10% Stack Speed', type: 'stackBonus', val: 0.1 },
   { id: 'precision', name: 'Precision Doc.', icon: '🎯', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: '+5% Crit Chance', type: 'crit', val: 0.05 },
-  { id: 'titan', name: 'Titan Contract', icon: '📜', cat: CAT_TRASH, rarity: 'legendary', price: 1500, perk: '+20 Flat Boss Dmg', type: 'bossDmgFlat', val: 20 },
+  { id: 'titan', name: 'Titan Contract', icon: '📜', cat: CAT_TRASH, rarity: 'legendary', price: 1500, perk: '+20 Flat Boss Dmg', type: 'bossDmg', val: 20 },
   { id: 'bailout', name: 'Corp. Bailout', icon: '🏦', cat: CAT_COMPOST, rarity: 'legendary', price: 1500, perk: 'Bankrupt Limit -100', type: 'bailout', val: 100 },
   { id: 'magnet', name: 'Magnetic Gloves', icon: '🧲', cat: CAT_RECYCLE, rarity: 'legendary', price: 1500, perk: 'Hitbox +20%', type: 'hitbox', val: 0.2 },
-
   { id: 'blood', name: 'Blood Market', icon: '🩸', cat: CAT_TRASH, rarity: 'lunar', price: 3000, perk: '+40% Cash, +40% Penalty', type: 'blood', val: 0.4 },
   { id: 'time', name: 'Time Collapse', icon: '⏳', cat: CAT_RECYCLE, rarity: 'lunar', price: 3000, perk: '-20% Fall Speed, +30% Spawn Rate', type: 'chaos', val: 0.2 },
   { id: 'awakening', name: 'Boss Awakening', icon: '👁️', cat: CAT_COMPOST, rarity: 'lunar', price: 3000, perk: 'Boss Reward x2, Boss HP +50%', type: 'bossRisk', val: 1 },
@@ -194,7 +190,7 @@ const PERK_DB = [
 ];
 
 const HAZARD_ITEM = { id: 'hazard', name: 'TOXIC WASTE', icon: '☢️', cat: 'hazard', rarity: 'hazard' };
-const ACID_ITEM = { id: 'acid_vial', name: 'Acid Vial', icon: '🧪', cat: CAT_TRASH, rarity: 'toxic', perk: '-3% Cash, -5% Boss Dmg (DELETE TO CURE)', type: 'corrosive', val: 0.05 };
+const ACID_ITEM = { id: 'acid_vial', name: 'Acid Vial', icon: '🧪', cat: CAT_TRASH, rarity: 'toxic', perk: '-3% Cash, -1 Boss Dmg (DELETE TO CURE)', type: 'corrosive', val: 0.03 };
 
 const BOSS_ITEMS = [
   { id: 'boss_slime', name: 'Toxic Slime', icon: '🤮', cat: CAT_TRASH, rarity: 'common' },
@@ -203,32 +199,32 @@ const BOSS_ITEMS = [
 ];
 
 const PERK_DESCRIPTIONS = {
-    hands: "Reduces falling speed of all items by 5%. Makes the game slightly slower.",
-    gloves: "Reduces the penalty for missing/wrong items by $3. Stacks.",
+    hands: "Reduces falling speed of all items by 5%.",
+    gloves: "Reduces the penalty for missing/wrong items by $3.",
     training: "Increases the base value of all items by 5%.",
     storage: "Increases the value bonus from owning duplicates by 5%.",
     subsidy: "Increases the value of all Recycle items by 10%.",
     grant: "Increases the value of all Compost items by 10%.",
     tax: "Increases the value of all Trash items by 10%.",
     combo: "Multiplies total cash flow by 1.05x.",
-    analyst: "Increases Luck by 5%. Find rare items more often.",
+    analyst: "Increases Luck by 5%.",
     insurance: "Blocks 1 penalty dollar. Works like a stronger Glove.",
-    pressure: "Deal +10 FLAT extra damage to Bosses per click. Essential for later waves.",
-    greed: "Gain +10% Cash, but suffer +10% higher Penalties. Risk/Reward.",
-    mirror: "Broken Mirror: +20% Luck, but -10% Cash. A gamble.",
+    pressure: "Deal +10 FLAT extra damage to Bosses.",
+    greed: "Gain +10% Cash, but suffer +10% higher Penalties.",
+    mirror: "Broken Mirror: +20% Luck, but -10% Cash.",
     infra: "Massive 15% boost to ALL income sources.",
     efficiency: "Stacks value 10% faster. Great for late game.",
     precision: "5% Chance to deal Double Damage (Crit) to bosses.",
     titan: "+20 FLAT Boss Damage. Melts bosses.",
-    bailout: "Lowers the Bankruptcy limit by $100. Survive more debt.",
-    magnet: "Increases item hitbox size by 20%. Easier to click.",
-    blood: "Huge +40% Cash boost, but +40% Penalty. Dangerous.",
+    bailout: "Lowers the Bankruptcy limit by $100.",
+    magnet: "Increases item hitbox size by 20%.",
+    blood: "Huge +40% Cash boost, but +40% Penalty.",
     time: "Slows time by 20%, but spawns items 30% faster.",
     awakening: "Bosses have +50% HP but give Double Rewards.",
     fragile: "Cash x2. Shields disabled. One miss hurts.",
     corrupt: "+30% Luck. Common items become worthless.",
     collapse: "Stack value x2. Lose 5% of total cash every minute.",
-    acid_vial: "TOXIC: Reduces Global Cash by 3% and Boss Damage by 5% per vial. Delete immediately."
+    acid_vial: "TOXIC: Reduces Global Cash by 3% and Boss Damage by 1 per vial."
 };
 
 // --- COMPONENTS ---
@@ -261,7 +257,7 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
 
 const ChaosToast = ({ data }) => (
   <div 
-    className={`fixed pointer-events-none font-black drop-shadow-lg z-50 text-center leading-none ${data.color}`}
+    className={`fixed pointer-events-none font-black drop-shadow-lg z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
     style={{ 
       left: data.x, 
       top: data.y, 
@@ -307,7 +303,8 @@ export default function App() {
     glitchTimer: 0,
     freezerTimer: 0,
     shield: 0, 
-    maxShield: 0 
+    maxShield: 0,
+    collapseTimer: 0
   });
 
   const [ui, setUi] = useState({
@@ -347,11 +344,14 @@ export default function App() {
     maxShield: 0
   });
 
-  const [toasts, setToasts] = useState([]);
-  const requestRef = useRef();
+  // Calculate buffs derived from state
+  // OPTIMIZED: Memoized to run only when inventory changes
+  const activeBuffs = useMemo(() => {
+    let additiveGlobal = 1.0;
+    let multipliers = 1.0;
+    let stackAdditive = 0; 
+    let stackMultipliers = 1.0;
 
-  // --- Buff Calculations ---
-  const getBuffs = () => {
     let b = {
       fallSpeedMul: 1,
       flatShield: 0,
@@ -373,37 +373,44 @@ export default function App() {
       acidDebuff: 0,
     };
 
-    Object.keys(state.current.inventory).forEach(id => {
+    Object.keys(ui.inventory).forEach(id => {
       let perkItem = PERK_DB.find(i => i.id === id);
       if (id === 'acid_vial') perkItem = ACID_ITEM;
 
       if (perkItem) {
-        const count = state.current.inventory[id];
+        const count = ui.inventory[id];
         if (count > 0) {
            switch(perkItem.type) {
             case 'speed': b.fallSpeedMul += (perkItem.val * count); break;
             case 'flatShield': b.flatShield += (perkItem.val * count); break;
             case 'baseReward': b.baseRewardMul += (perkItem.val * count); break;
-            case 'stackBonus': b.stackMul += (perkItem.val * count); break;
+            
+            case 'stackBonus': stackAdditive += (perkItem.val * count); break;
+            case 'collapse': stackMultipliers *= Math.pow(2, count); break; 
+            
             case 'catMod': b.catMod[perkItem.target] += (perkItem.val * count); break;
-            case 'globalCash': b.globalCashMul += (perkItem.val * count); break;
+            
+            case 'globalCash': additiveGlobal += (perkItem.val * count); break;
+            case 'risk': additiveGlobal += (0.1 * count); b.penaltyMul += (0.1 * count); break;
+            case 'blood': additiveGlobal += (0.4 * count); b.penaltyMul += (0.4 * count); break;
+            case 'tradeLuck': additiveGlobal -= (0.1 * count); b.luckAdd += (0.2 * count); break;
+            case 'corrosive': 
+                b.acidDebuff += count; 
+                additiveGlobal -= (0.03 * count); 
+                b.bossDmgFlat -= (1 * count); 
+                break;
+
+            case 'glassCannon': multipliers *= Math.pow(2, count); b.shieldsDisabled = true; break;
+
             case 'luck': b.luckAdd += (perkItem.val * count); break;
+            case 'bossDmg': b.bossDmgFlat += (perkItem.val * count); break; 
             case 'bossDmgFlat': b.bossDmgFlat += (perkItem.val * count); break; 
             case 'crit': b.critChance += (perkItem.val * count); break;
             case 'bailout': b.bailout += (perkItem.val * count); break;
             case 'hitbox': b.hitboxMul += (perkItem.val * count); break;
-            case 'risk': b.globalCashMul += (0.1 * count); b.penaltyMul += (0.1 * count); break;
-            case 'blood': b.globalCashMul += (0.4 * count); b.penaltyMul += (0.4 * count); break;
             case 'chaos': b.fallSpeedMul -= (0.2 * count); b.spawnRateMul += (0.3 * count); break;
             case 'bossRisk': b.bossRisk = true; break;
-            case 'glassCannon': b.globalCashMul += (1.0 * count); b.shieldsDisabled = true; break;
             case 'corruptLuck': b.luckAdd += (0.3 * count); b.commonNerf = true; break;
-            case 'tradeLuck': b.luckAdd += (0.2 * count); b.globalCashMul -= (0.1 * count); break;
-            case 'corrosive': 
-                b.acidDebuff += count; 
-                b.globalCashMul -= (0.03 * count); 
-                b.bossDmgMul -= (0.05 * count); 
-                break;
             default: break;
           }
         }
@@ -411,11 +418,15 @@ export default function App() {
     });
     
     b.fallSpeedMul = Math.max(0.2, b.fallSpeedMul);
-    b.globalCashMul = Math.max(0.1, b.globalCashMul); 
-    b.bossDmgMul = Math.max(0, b.bossDmgMul);
-    
+    additiveGlobal = Math.max(0.1, additiveGlobal);
+    b.globalCashMul = additiveGlobal * multipliers;
+    b.stackMul = (1 + stackAdditive) * stackMultipliers;
+
     return b;
-  };
+  }, [ui.inventory]); // Only recalculate when inventory changes
+
+  const [toasts, setToasts] = useState([]);
+  const requestRef = useRef();
 
   // --- WEIGHTED RANDOM ---
   const getWeightedItem = (pool, luck) => {
@@ -438,6 +449,39 @@ export default function App() {
       random -= entry.weight;
     }
     return pool[0].item;
+  };
+
+  const getShopSelection = (luck) => {
+    const w = { common: 300, uncommon: 150, rare: 50, legendary: 10, lunar: 2 };
+    
+    let pool = PERK_DB.map(p => {
+      let weight = w[p.rarity] || 10;
+      if (['rare', 'legendary', 'lunar'].includes(p.rarity)) {
+         weight *= luck;
+      }
+      return { ...p, weight };
+    });
+
+    const selected = [];
+    for (let i = 0; i < 3; i++) {
+      if (pool.length === 0) break;
+      const total = pool.reduce((a, b) => a + b.weight, 0);
+      let r = Math.random() * total;
+      
+      let pickedIndex = -1;
+      for (let j = 0; j < pool.length; j++) {
+        r -= pool[j].weight;
+        if (r <= 0) {
+          pickedIndex = j;
+          break;
+        }
+      }
+      if (pickedIndex === -1) pickedIndex = 0;
+      
+      selected.push(pool[pickedIndex]);
+      pool.splice(pickedIndex, 1);
+    }
+    return selected;
   };
 
   // --- Game Loop ---
@@ -478,7 +522,8 @@ export default function App() {
       glitchTimer: 0,
       freezerTimer: 0,
       shield: 0,
-      maxShield: 0
+      maxShield: 0,
+      collapseTimer: 0
     };
     
     setUi(prev => ({ 
@@ -506,7 +551,7 @@ export default function App() {
     requestRef.current = requestAnimationFrame(loop);
   };
 
-  const spawnItem = (buffs) => {
+  const spawnItem = () => {
     let newItem;
     let isPerk = false;
     let isHazard = false;
@@ -542,7 +587,7 @@ export default function App() {
         newItem = HAZARD_ITEM;
         isHazard = true;
       } else {
-        const totalLuck = state.current.baseLuck + buffs.luckAdd;
+        const totalLuck = state.current.baseLuck + activeBuffs.luckAdd;
         const perkChance = Math.min(0.10, 0.01 * totalLuck); 
         
         if (Math.random() < perkChance) {
@@ -564,7 +609,7 @@ export default function App() {
     const waveMod = state.current.wave * 0.05; 
     let chaosMult = window.ECO_SETTINGS.chaos ? 2.0 : 1.0;
 
-    const finalSpeed = (baseSpeed + waveMod) * buffs.fallSpeedMul * variance * chaosMult;
+    const finalSpeed = (baseSpeed + waveMod) * activeBuffs.fallSpeedMul * variance * chaosMult;
 
     let opacity = 1.0;
     if (state.current.bossTrait === 'phantom') opacity = 0.3 + (Math.random() * 0.4);
@@ -591,7 +636,18 @@ export default function App() {
     }
 
     state.current.lastTime = time;
-    const buffs = getBuffs();
+
+    // --- MARKET COLLAPSE PENALTY ---
+    if (state.current.inventory['collapse'] > 0) {
+        state.current.collapseTimer++;
+        if (state.current.collapseTimer > 3600) { 
+            const drain = state.current.money * 0.05;
+            state.current.money -= drain;
+            addToast(`-$${drain.toFixed(1)}`, "text-red-900", "50%", "10%", 20, "MARKET COLLAPSE");
+            playSound('hit');
+            state.current.collapseTimer = 0;
+        }
+    }
 
     // 1. Spawning
     if (!state.current.bossDying) {
@@ -599,17 +655,16 @@ export default function App() {
       let baseRate = state.current.bossActive ? 70 : 90;
       baseRate = Math.max(20, baseRate - (state.current.wave * 4)); 
       
-      // BOSS SPECIFIC RATES
       if (state.current.bossTrait === 'swarm') baseRate = 10; 
       if (state.current.bossTrait === 'sniper') baseRate = 120; 
       
       let chaosRate = window.ECO_SETTINGS.chaos ? 0.5 : 1.0;
       let cheatRate = 1.0 / ui.spawnRateMult; 
 
-      let finalRate = (baseRate / buffs.spawnRateMul) * chaosRate * cheatRate;
+      let finalRate = (baseRate / activeBuffs.spawnRateMul) * chaosRate * cheatRate;
 
       if (state.current.spawnTimer > finalRate) {
-        spawnItem(buffs);
+        spawnItem(activeBuffs);
         state.current.spawnTimer = 0;
       }
     }
@@ -617,7 +672,7 @@ export default function App() {
     // 2. Timers
     if (!state.current.bossActive && state.current.bossTimer > 0) {
       state.current.bossTimer -= 1/60; 
-      if (state.current.bossTimer <= 0) startBoss(buffs);
+      if (state.current.bossTimer <= 0) startBoss(activeBuffs);
     }
 
     // 3. Glitch Boss Logic
@@ -673,7 +728,7 @@ export default function App() {
     const speedMult = state.current.bossDying ? 0.1 : 1.0;
 
     // --- RECALCULATE LIMITS DYNAMICALLY ---
-    const effectiveLimit = state.current.bankruptcyBase - buffs.bailout;
+    const effectiveLimit = state.current.bankruptcyBase - activeBuffs.bailout;
     state.current.bankruptcyLimit = effectiveLimit;
 
     state.current.items = state.current.items.filter(item => {
@@ -695,9 +750,9 @@ export default function App() {
             addToast("SAFE", "text-slate-400", `${item.x}%`, "90%", 20);
           } else {
             let rawPenalty = item.isBossItem ? state.current.penalty * 1.5 : state.current.penalty;
-            rawPenalty *= buffs.penaltyMul;
+            rawPenalty *= activeBuffs.penaltyMul;
             let finalPenalty = rawPenalty;
-            if (!buffs.shieldsDisabled) finalPenalty = Math.max(0, finalPenalty - buffs.flatShield);
+            if (!activeBuffs.shieldsDisabled) finalPenalty = Math.max(0, finalPenalty - activeBuffs.flatShield);
             applyPenalty(finalPenalty);
           }
         }
@@ -707,10 +762,31 @@ export default function App() {
       return true;
     });
 
-    state.current.toasts = state.current.toasts.filter(t => {
-      t.life -= 0.02;
-      return t.life > 0;
+    // --- TOAST UPDATE (CHAOS SEQUENCE) ---
+    state.current.toasts.forEach(t => {
+      t.age = (t.age || 0) + 1;
+      
+      if (t.sequence && t.sequence.length > 0) {
+         // Check if we need to advance sequence
+         const nextStage = t.sequence[0];
+         if (t.age >= nextStage.delay) {
+            t.text = nextStage.text;
+            t.color = nextStage.color || t.color;
+            t.size = nextStage.size || t.size;
+            t.shake = nextStage.shake || false;
+            // CHAOS ROTATION UPDATE
+            t.rot = Math.random() * 20 - 10; // Randomize angle on every step
+            
+            playSound('pop'); 
+
+            t.sequence.shift(); // Remove used stage
+            t.life = 1.0; // Refresh life on update
+         }
+      }
+      
+      t.life -= 0.015; // Slower fade for reading
     });
+    state.current.toasts = state.current.toasts.filter(t => t.life > 0);
 
     // BATTERY SAVER (ECO MODE) SHAKE OVERRIDE
     if (window.ECO_SETTINGS.ecoMode) {
@@ -719,10 +795,8 @@ export default function App() {
       state.current.shake *= 0.9;
     }
 
-    // --- RECALCULATE MAX SHIELD EACH FRAME (Dynamic based on inventory) ---
+    // --- RECALCULATE MAX SHIELD EACH FRAME ---
     const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
-    // Max shield = Items * 0.1
-    // We update max shield, but current shield only goes up via collecting or regen at start of wave
     const newMaxShield = totalItems * BASE_SHIELD_PER_ITEM; 
     state.current.maxShield = newMaxShield;
 
@@ -737,13 +811,13 @@ export default function App() {
       gameOver: state.current.gameOver,
       selectedUid: state.current.selectedUid,
       penalty: state.current.penalty,
-      currentLuck: state.current.baseLuck + buffs.luckAdd,
+      currentLuck: state.current.baseLuck + activeBuffs.luckAdd,
       bankruptcyLimit: effectiveLimit,
       shake: state.current.shake,
       bossTrait: state.current.bossTrait,
       bossDying: state.current.bossDying,
       shield: state.current.shield,
-      maxShield: state.current.maxShield
+      maxShield: state.current.maxShield,
     }));
     
     setToasts([...state.current.toasts]);
@@ -769,7 +843,7 @@ export default function App() {
     setUi(prev => ({ ...prev, menu: menuName, inspectItem: null }));
   };
 
-  const addToast = (text, color, x, y, size = 20, subtext = null) => {
+  const addToast = (text, color, x, y, size = 20, subtext = null, sequence = null) => {
     state.current.toasts.push({
       id: Date.now() + Math.random(),
       text,
@@ -779,7 +853,9 @@ export default function App() {
       size,
       subtext,
       rot: (Math.random() - 0.5) * 20,
-      life: 1.0
+      life: 1.0,
+      age: 0,
+      sequence: sequence
     });
   };
 
@@ -851,13 +927,13 @@ export default function App() {
     const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
     state.current.shield = totalItems * BASE_SHIELD_PER_ITEM;
 
-    const buffs = getBuffs();
+    const buffs = activeBuffs; // Use current buffs for reward calc
     let reward = 100 * state.current.wave;
     if (buffs.bossRisk) reward *= 2;
     state.current.money += reward;
     
     const shuffled = [...PERK_DB].sort(() => 0.5 - Math.random());
-    state.current.shopSelection = shuffled.slice(0, 3);
+    state.current.shopSelection = getShopSelection(state.current.baseLuck + buffs.luckAdd);
 
     state.current.shopOpen = true;
     setUi(prev => ({ 
@@ -876,7 +952,7 @@ export default function App() {
     if (ui.godMode) return;
     if (amount <= 0) return;
     
-    const buffs = getBuffs();
+    const buffs = activeBuffs;
 
     // Check Shield First
     if (!buffs.shieldsDisabled && state.current.shield > 0) {
@@ -898,7 +974,6 @@ export default function App() {
     addToast(`-$${amount.toFixed(0)}`, "text-red-500", "50%", "50%", 30);
     playSound('hit');
     
-    // Use stored/recalc limit
     const limit = state.current.bankruptcyLimit;
 
     if (state.current.money <= limit) {
@@ -917,7 +992,6 @@ export default function App() {
       state.current.items = state.current.items.filter(i => i.uid !== item.uid);
       playSound('explode');
       
-      const buffs = getBuffs();
       if (!ui.godMode && state.current.money <= state.current.bankruptcyLimit) {
         state.current.gameOver = true;
         setUi(prev => ({ ...prev, gameOver: true }));
@@ -937,13 +1011,12 @@ export default function App() {
     const item = items.find(i => i.uid === selectedUid);
     if (!item) return;
 
-    const buffs = getBuffs();
+    const buffs = activeBuffs; // Use optimized buffs
 
     if (item.cat === binCategory) {
       if (item.isBossItem) {
-        let dmg = Math.max(1, (10 + buffs.bossDmgFlat) * buffs.bossDmgMul); 
+        let dmg = Math.max(1, 10 + buffs.bossDmgFlat); 
         
-        // Crit?
         if (Math.random() < buffs.critChance) {
            dmg *= 2;
            addToast("CRIT!", "text-yellow-500", `${item.x}%`, "30%", 30);
@@ -954,7 +1027,6 @@ export default function App() {
         playSound('attack');
         state.current.bossHealth -= dmg;
         
-        // ACIDIFY BOSS LOGIC
         if (item.id === 'acid_vial') {
            const currentCount = state.current.inventory[item.id] || 0;
            state.current.inventory[item.id] = currentCount + 1;
@@ -973,7 +1045,6 @@ export default function App() {
         const currentCount = state.current.inventory[item.id] || 0;
         state.current.inventory[item.id] = currentCount + 1;
         
-        // ADD SHIELD FOR COLLECTING ITEM
         if (!buffs.shieldsDisabled) {
            state.current.shield += BASE_SHIELD_PER_ITEM;
         }
@@ -982,22 +1053,52 @@ export default function App() {
            addToast(`${item.name}`, "text-purple-400", "50%", "30%", 25, "UNLOCKED");
            playSound('success');
         } else {
-           // MULTIPLICATIVE CASH LOGIC
            let base = BASE_REWARD * buffs.baseRewardMul;
            let rarityBonus = RARITY[item.rarity].val;
            
            if (buffs.commonNerf && item.rarity === 'common') rarityBonus *= 0.8;
            
-           // Base + StackBonus
+           // STACK LOGIC
            let rawValue = base + ((currentCount * rarityBonus) * buffs.stackMul);
            
-           // Apply Multipliers
            let profit = rawValue * buffs.catMod[item.cat] * buffs.globalCashMul;
            
-           // REMOVED DEBT POWER LOGIC
-
            const bonusText = (profit - BASE_REWARD).toFixed(1);
-           addToast(`+$${BASE_REWARD}`, "text-green-500", `${item.x}%`, `${item.y}%`, 24, bonusText > 0 ? `+$${bonusText} BONUS` : null);
+           const itemRarityColor = safeRarity(item.rarity).text;
+
+           if (bonusText > 0) {
+              const sequence = [];
+              const activeModifiers = []; 
+
+              if (state.current.inventory['training'] > 0) activeModifiers.push({name: "TRAINING", rarity: 'common'});
+
+              if (item.cat === CAT_RECYCLE && state.current.inventory['subsidy'] > 0) activeModifiers.push({name: "SUBSIDY", rarity: 'uncommon'});
+              if (item.cat === CAT_COMPOST && state.current.inventory['grant'] > 0) activeModifiers.push({name: "GRANT", rarity: 'uncommon'});
+              if (item.cat === CAT_TRASH && state.current.inventory['tax'] > 0) activeModifiers.push({name: "TAX CREDIT", rarity: 'uncommon'});
+
+              if (currentCount > 0) { 
+                 if (state.current.inventory['storage'] > 0) activeModifiers.push({name: "STORAGE", rarity: 'common'});
+                 if (state.current.inventory['efficiency'] > 0) activeModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
+                 if (state.current.inventory['collapse'] > 0) activeModifiers.push({name: "COLLAPSE", rarity: 'lunar'});
+              }
+
+              if (state.current.inventory['infra'] > 0) activeModifiers.push({name: "INFRA", rarity: 'legendary'});
+              if (state.current.inventory['combo'] > 0) activeModifiers.push({name: "CASH FLOW", rarity: 'uncommon'}); 
+              if (state.current.inventory['blood'] > 0) activeModifiers.push({name: "BLOOD", rarity: 'lunar'});
+              if (state.current.inventory['fragile'] > 0) activeModifiers.push({name: "FRAGILE", rarity: 'lunar'});
+              if (state.current.inventory['greed'] > 0) activeModifiers.push({name: "GREED", rarity: 'rare'});
+              
+              activeModifiers.forEach(mod => {
+                 const modColor = safeRarity(mod.rarity).text;
+                 sequence.push({ text: mod.name, color: modColor, size: 18, delay: 20 + (activeModifiers.indexOf(mod) * 15) });
+              });
+              
+              sequence.push({ text: `+$${profit.toFixed(0)}`, color: "text-green-500", size: 30, shake: true, delay: 20 + (activeModifiers.length * 15) + 15 });
+
+              addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
+           } else {
+              addToast(`+$${profit.toFixed(0)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
+           }
 
            state.current.money += profit;
            playSound('success');
@@ -1024,13 +1125,11 @@ export default function App() {
     const count = state.current.inventory[itemId];
     if (count > 0) {
       state.current.inventory[itemId] = count - 1;
-      // REMOVE SHIELD ON DELETE
       state.current.shield = Math.max(0, state.current.shield - BASE_SHIELD_PER_ITEM);
       setUi(prev => ({ ...prev, inventory: { ...state.current.inventory } }));
     }
   };
 
-  // --- CHEAT ACTIONS ---
   const unlockAll = () => {
     const all = [...WASTE_DB, ...PERK_DB];
     all.forEach(i => {
@@ -1042,10 +1141,8 @@ export default function App() {
 
   const skipWave = () => {
     if (state.current.bossActive) triggerBossDeath();
-    else startBoss(getBuffs());
+    else startBoss(activeBuffs);
   };
-
-  // --- RENDER ---
 
   const themeClass = window.ECO_SETTINGS.theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-b from-sky-100 to-white';
   const hudOrder = window.ECO_SETTINGS.leftHanded ? 'flex-row-reverse' : 'flex-row';
@@ -1057,28 +1154,12 @@ export default function App() {
         transform: `translate(${(Math.random() - 0.5) * ui.shake}px, ${(Math.random() - 0.5) * ui.shake}px)`
       }}
     >
-      
-      {/* 1. THE VOID: Static Black Background 
-        This is placed behind everything. If the shake moves the game container, 
-        this black layer ensures you never see the white browser body.
-      */}
       <div className="fixed inset-0 bg-black z-[-10]" />
-
-      {/* 2. THE GAME CONTAINER
-        This is what shakes. It contains the gradient background.
-      */}
       <div className={`relative w-full h-full max-w-lg mx-auto shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-
-        {/* 3. THE ATMOSPHERE: Expanded Background
-           This sits inside the Game Container but is sized at 300% to ensure edges are never visible.
-           -top-[100%] means it starts way above the viewport.
-        */}
         <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] z-0 ${themeClass}`} />
         
-        {/* === HUD === */}
         <div className={`absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-30 pointer-events-none ${hudOrder}`}>
           <div className="flex flex-col gap-2 pointer-events-auto">
-            {/* Money & Shield */}
             <div className={`px-4 py-2 rounded-xl shadow-lg border-2 flex flex-col transition-colors bg-white border-white ${ui.money < 0 ? 'border-red-400 bg-red-50' : ''}`}>
                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex justify-between">
                  <span>FUNDS</span>
@@ -1088,30 +1169,22 @@ export default function App() {
                  <DollarSign size={18} strokeWidth={3} />
                  {ui.money.toFixed(2)}
                </div>
-               
-               {/* Shield Bar */}
                <div className="w-full h-1 bg-slate-100 mt-1 rounded-full overflow-hidden">
                   <div className="h-full bg-blue-500 transition-all" style={{width: `${Math.min(100, (ui.shield / Math.max(1, ui.maxShield)) * 100)}%`}}></div>
                </div>
             </div>
             
-            {/* Stats & LIMIT - HIDDEN ON BOSS FIGHT */}
             {!ui.bossActive && (
               <div className="flex gap-2">
                 <div className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200 flex items-center gap-1 shadow-sm">
                    <Clover size={12} /> {ui.currentLuck.toFixed(1)}x
                 </div>
-                <div className="bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-red-200 flex items-center gap-1 shadow-sm">
-                   -{ui.penalty}
-                </div>
-                {/* NEW LIMIT BOX */}
                 <div className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 shadow-sm ${ui.bankruptcyLimit >= 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                    <TrendingUp size={12}/> LIMIT: {ui.bankruptcyLimit}
                 </div>
               </div>
             )}
             
-            {/* SKIP BUTTON (CHEAT) */}
             {(ui.godMode || ui.spawnRateMult > 1) && (
               <button onClick={skipWave} className="bg-red-500 text-white font-black text-xs py-2 px-3 rounded shadow animate-pulse pointer-events-auto">
                 SKIP WAVE ⏭
@@ -1119,7 +1192,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Timer / Boss Status */}
           {ui.menu === 'none' && (
             <div className={`px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg transition-all ${ui.bossActive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800/90 text-white'}`}>
               <Clock size={16} />
@@ -1152,7 +1224,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* === BOSS ALERT OVERLAY === */}
         {ui.bossActive && !ui.bossDying && ui.bossHealth === ui.bossMaxHealth && (
            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
              <div className="bg-red-600 text-white text-6xl font-black p-4 rotate-12 animate-pulse shadow-xl border-4 border-white">
@@ -1161,7 +1232,6 @@ export default function App() {
            </div>
         )}
 
-        {/* === BOSS BAR & NAME === */}
         {ui.bossActive && !ui.bossDying && (
           <div className="absolute top-24 left-6 right-6 z-20 animate-slide-down">
             <div className="flex justify-center mb-2">
@@ -1197,7 +1267,6 @@ export default function App() {
           </div>
         )}
 
-        {/* === BOSS DEATH OVERLAY === */}
         {ui.bossDying && (
           <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center animate-fadeIn">
              <div className="bg-emerald-500 text-white p-8 rounded-3xl shadow-2xl border-4 border-white transform scale-125 animate-bounce text-center">
@@ -1208,7 +1277,6 @@ export default function App() {
           </div>
         )}
 
-        {/* === GAME AREA === */}
         <div 
           className="absolute inset-0 z-10" 
           onPointerDown={() => {
@@ -1228,15 +1296,17 @@ export default function App() {
                  left: `${item.x}%`,
                  top: `${item.y}%`,
                  transform: `translate(-50%, -50%) rotate(${item.rotation}deg)`,
-                 opacity: item.opacity || 1
+                 opacity: item.opacity || 1,
+                 width: `${3.5 * (activeBuffs.hitboxMul || 1)}rem`,
+                 height: `${3.5 * (activeBuffs.hitboxMul || 1)}rem`
                }}
              >
                {ui.selectedUid === item.uid && !item.isHazard && (
-                 <div className="absolute w-20 h-20 rounded-full border-4 border-dashed border-yellow-400 animate-spin-slow pointer-events-none"></div>
+                 <div className="absolute w-full h-full rounded-full border-4 border-dashed border-yellow-400 animate-spin-slow pointer-events-none"></div>
                )}
                
                <div className={`
-                 w-14 h-14 rounded-xl shadow-md border-b-4 flex items-center justify-center text-3xl bg-white text-slate-900
+                 w-full h-full rounded-xl shadow-md border-b-4 flex items-center justify-center text-3xl bg-white text-slate-900
                  ${ui.selectedUid === item.uid ? 'border-yellow-400 bg-yellow-50' : item.isHazard ? 'border-lime-500 bg-lime-100 animate-pulse' : 'border-slate-200'}
                  ${item.isBossItem ? 'bg-red-50 border-red-200' : ''}
                  ${item.isPerkDrop ? 'ring-4 ring-purple-400 bg-purple-50 animate-pulse' : ''}
@@ -1258,10 +1328,8 @@ export default function App() {
            ))}
         </div>
 
-        {/* CHAOS TOASTS */}
         {toasts.map(t => <ChaosToast key={t.id} data={t} />)}
 
-        {/* === BINS === */}
         <div className="absolute bottom-0 w-full flex gap-2 px-2 pb-2 z-20 transition-all duration-300">
           {ui.binOrder.map((cat, idx) => (
             <div key={idx} className="flex-1">
@@ -1275,15 +1343,12 @@ export default function App() {
           ))}
         </div>
 
-        {/* === MENUS === */}
-
-        {/* START */}
         {ui.menu === 'start' && (
           <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-6 text-white animate-fadeIn">
             <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 mb-2">ECOING</h1>
             <div className="text-slate-400 mb-8 font-mono tracking-widest text-xs flex gap-4">
-              <span>v22.5</span>
-              <span>VOID FIX</span>
+              <span>V1.0</span>
+              <span>LAUNCH</span>
             </div>
             
             <div className="flex flex-col gap-3 w-full max-w-xs">
@@ -1311,7 +1376,6 @@ export default function App() {
           </div>
         )}
 
-        {/* PAUSE MENU */}
         {ui.menu === 'paused' && (
            <div className="absolute inset-0 bg-slate-900/90 z-50 flex flex-col items-center justify-center p-6 backdrop-blur">
               <h2 className="text-4xl font-black text-white mb-8 tracking-widest">PAUSED</h2>
@@ -1329,14 +1393,12 @@ export default function App() {
            </div>
         )}
 
-        {/* SETTINGS MENU */}
         {ui.menu === 'settings' && (
           <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col pt-6 px-6 text-white animate-slide-up">
             <h2 className="text-3xl font-black mb-8 flex items-center gap-2 shrink-0"><Settings /> CONFIG</h2>
             
             <div className="flex-1 overflow-y-auto space-y-6">
               
-              {/* VOLUME SECTION */}
               <div className="space-y-2 shrink-0">
                 <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Volume2 size={14}/> AUDIO SETTINGS</label>
                 <div className="bg-slate-800 p-4 rounded-xl space-y-4">
@@ -1358,7 +1420,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* VISUALS SECTION */}
               <div className="space-y-2 shrink-0">
                 <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Monitor size={14}/> VISUAL SETTINGS</label>
                 <div className="bg-slate-800 rounded-xl overflow-hidden divide-y divide-slate-700">
@@ -1403,7 +1464,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* GAMEPLAY SECTION */}
               <div className="space-y-2 shrink-0">
                 <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Sliders size={14}/> GAMEPLAY</label>
                 <div className="bg-slate-800 rounded-xl overflow-hidden divide-y divide-slate-700">
@@ -1445,13 +1505,11 @@ export default function App() {
           </div>
         )}
 
-        {/* CHEATS MENU */}
         {ui.menu === 'cheats' && (
           <div className="absolute inset-0 bg-black z-50 flex flex-col p-6 text-green-400 font-mono animate-fadeIn overflow-y-auto">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2 border-b border-green-800 pb-2 sticky top-0 bg-black z-10"><Terminal /> SANDBOX CONSOLE</h2>
             
             <div className="space-y-6 pb-20">
-              {/* TOGGLES */}
               <div className="flex gap-2">
                  <button 
                    onClick={() => setUi(p=>({...p, godMode: !p.godMode}))}
@@ -1476,7 +1534,6 @@ export default function App() {
                  </button>
               </div>
 
-              {/* INPUTS */}
               <div>
                 <label className="text-xs uppercase opacity-70">Spawn Rate Multiplier (1x - 50x)</label>
                 <input 
@@ -1546,10 +1603,8 @@ export default function App() {
           </div>
         )}
 
-        {/* LUXURY WIKI */}
         {ui.menu === 'guide' && (
           <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col text-white overflow-hidden animate-slide-up">
-            {/* Nav */}
             <div className="flex bg-slate-900 p-2 gap-2 overflow-x-auto shrink-0 border-b border-slate-800">
               {['basics', 'economy', 'bestiary', 'hazards', 'perks', 'catalog'].map(tab => (
                 <button 
@@ -1562,7 +1617,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 pb-20">
               
               {ui.guideTab === 'basics' && (
@@ -1728,7 +1782,6 @@ export default function App() {
           </div>
         )}
 
-        {/* INVENTORY */}
         {ui.menu === 'inventory' && (
           <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 animate-slide-up">
             
@@ -1736,7 +1789,6 @@ export default function App() {
               <div className="flex gap-4 items-center">
                  <h2 className="text-xl font-black flex items-center gap-2"><Briefcase /> STASH</h2>
                  <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-                   {/* FIXED: Resources is First */}
                    <button 
                      onClick={() => { playSound('click'); setUi(p=>({...p, invTab: 'waste', inspectItem: null})); }}
                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${ui.invTab === 'waste' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
@@ -1758,11 +1810,10 @@ export default function App() {
                <div className="grid grid-cols-4 gap-2 content-start">
                   {Object.entries(ui.inventory).map(([id, count]) => {
                     let item = WASTE_DB.find(i => i.id === id) || PERK_DB.find(i => i.id === id);
-                    if (id === 'acid_vial') item = ACID_ITEM; // Special check for acid
+                    if (id === 'acid_vial') item = ACID_ITEM; 
                     
                     if (!item || count <= 0) return null;
                     
-                    // Acid Vial logic: It is NOT a perk for tab purposes, so it goes to Waste/Resource tab
                     const isPerk = !!PERK_DB.find(i => i.id === id);
                     if (ui.invTab === 'waste' && isPerk) return null;
                     if (ui.invTab === 'perks' && !isPerk) return null;
@@ -1770,7 +1821,6 @@ export default function App() {
                     const rarity = safeRarity(item.rarity);
                     const isSelected = ui.inspectItem?.id === id;
                     
-                    // TOXIC ITEM GLOW
                     const isToxic = item.rarity === 'toxic';
 
                     return (
@@ -1827,7 +1877,6 @@ export default function App() {
           </div>
         )}
 
-        {/* RANDOM SHOP */}
         {ui.shopOpen && (
           <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col p-6 text-white animate-fadeIn">
             <div className="flex justify-between items-center mb-1">
@@ -1880,6 +1929,28 @@ export default function App() {
               })}
             </div>
 
+            <button 
+              onClick={() => {
+                if (state.current.money >= SHOP_REROLL_COST) {
+                   playSound('select');
+                   state.current.money -= SHOP_REROLL_COST;
+                   const shuffled = [...PERK_DB].sort(() => 0.5 - Math.random());
+                   state.current.shopSelection = getShopSelection(state.current.baseLuck + activeBuffs.luckAdd);
+                   setUi(prev => ({ 
+                      ...prev, 
+                      money: state.current.money,
+                      shopSelection: state.current.shopSelection 
+                   }));
+                } else {
+                   playSound('hit');
+                }
+              }}
+              disabled={ui.money < SHOP_REROLL_COST}
+              className="w-full mb-2 bg-yellow-600/50 border border-yellow-500/50 text-yellow-200 font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all"
+            >
+              <RefreshCw size={16} /> REROLL SHOP (${SHOP_REROLL_COST})
+            </button>
+
             <div className="flex gap-2 mt-2">
               {ui.godMode && (
                 <button 
@@ -1904,7 +1975,6 @@ export default function App() {
           </div>
         )}
 
-        {/* GAME OVER */}
         {ui.gameOver && (
           <div className="absolute inset-0 bg-red-950/95 z-50 flex flex-col items-center justify-center p-8 backdrop-blur text-white animate-pulse-slow">
              <Skull size={64} className="text-red-500 mb-4" />
@@ -1931,29 +2001,6 @@ export default function App() {
                </button>
              </div>
           </div>
-        )}
-
-        {/* BOSS NAME BADGE */}
-        {ui.bossActive && !ui.bossDying && (
-           <div className="absolute top-24 left-6 right-6 z-20 animate-slide-down flex justify-center mb-2 pointer-events-none">
-             <div className="bg-red-900/90 text-white px-4 py-1 rounded-full font-black text-xs tracking-[0.2em] shadow-lg border border-red-500">
-                 {(() => {
-                    let key = 'TRASH TITAN';
-                    if (ui.bossTrait === 'glitch') key = 'GLITCH PRIME';
-                    if (ui.bossTrait === 'rush') key = 'SPEED DEMON';
-                    if (ui.bossTrait === 'phantom') key = 'THE PHANTOM';
-                    if (ui.bossTrait === 'acid') key = 'ACIDIFY';
-                    if (ui.bossTrait === 'swarm') key = 'THE SWARM';
-                    if (ui.bossTrait === 'sniper') key = 'THE SNIPER';
-                    if (ui.bossTrait === 'quantum') key = 'QUANTUM CORE';
-                    if (ui.bossTrait === 'gambler') key = 'THE GAMBLER';
-                    if (ui.bossTrait === 'mimic') key = 'THE MIMIC';
-                    if (ui.bossTrait === 'freezer') key = 'ABSOLUTE ZERO';
-                    if (ui.bossTrait === 'iron') key = 'IRON CLAD';
-                    return key;
-                 })()}
-             </div>
-           </div>
         )}
 
       </div>
