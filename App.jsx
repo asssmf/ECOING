@@ -643,7 +643,7 @@ export default function App() {
         if (state.current.collapseTimer > 3600) { 
             const drain = state.current.money * 0.05;
             state.current.money -= drain;
-            addToast(`-$${drain.toFixed(1)}`, "text-red-900", "50%", "10%", 20, "MARKET COLLAPSE");
+            addToast(`-$${drain.toFixed(2)}`, "text-red-900", "50%", "10%", 20, "MARKET COLLAPSE");
             playSound('hit');
             state.current.collapseTimer = 0;
         }
@@ -971,7 +971,7 @@ export default function App() {
     
     state.current.money -= amount;
     if (window.ECO_SETTINGS.shake) state.current.shake = 5; 
-    addToast(`-$${amount.toFixed(0)}`, "text-red-500", "50%", "50%", 30);
+    addToast(`-$${amount.toFixed(2)}`, "text-red-500", "50%", "50%", 30);
     playSound('hit');
     
     const limit = state.current.bankruptcyLimit;
@@ -1063,7 +1063,7 @@ export default function App() {
            
            let profit = rawValue * buffs.catMod[item.cat] * buffs.globalCashMul;
            
-           const bonusText = (profit - BASE_REWARD).toFixed(1);
+           const bonusText = (profit - BASE_REWARD).toFixed(2);
            const itemRarityColor = safeRarity(item.rarity).text;
 
            if (bonusText > 0) {
@@ -1093,11 +1093,11 @@ export default function App() {
                  sequence.push({ text: mod.name, color: modColor, size: 18, delay: 20 + (activeModifiers.indexOf(mod) * 15) });
               });
               
-              sequence.push({ text: `+$${profit.toFixed(0)}`, color: "text-green-500", size: 30, shake: true, delay: 20 + (activeModifiers.length * 15) + 15 });
+              sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: 20 + (activeModifiers.length * 15) + 15 });
 
               addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
            } else {
-              addToast(`+$${profit.toFixed(0)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
+              addToast(`+$${profit.toFixed(2)}`, "text-green-500", `${item.x}%`, `${item.y}%`, 20);
            }
 
            state.current.money += profit;
@@ -2007,5 +2007,4 @@ export default function App() {
     </div>
   );
 }
-
 
