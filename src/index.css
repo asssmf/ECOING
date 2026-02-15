@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CRITICAL FIXES FOR VERCEL / MOBILE */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Stops scrolling */
+  overscroll-behavior: none; /* Stops "bounce" effect on Mac/iOS */
+  touch-action: none; /* Disables pinch-zoom */
+  background-color: #0f172a; /* Matches the dark theme background */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center; /* Centers horizontally */
+  align-items: center;     /* Centers vertically */
+}
