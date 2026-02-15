@@ -257,7 +257,6 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
   );
 };
 
-// THE FINAL FIX: 2 divs to completely separate the float from the text animation
 const ChaosToast = ({ data }) => (
   <div 
     className="absolute pointer-events-none z-50 flex flex-col items-center justify-center"
@@ -354,7 +353,6 @@ export default function App() {
   });
 
   // Calculate buffs derived from state
-  // OPTIMIZED: Memoized to run only when inventory changes
   const activeBuffs = useMemo(() => {
     let additiveGlobal = 1.0;
     let multipliers = 1.0;
@@ -437,7 +435,7 @@ export default function App() {
     b.stackMul = (1 + stackAdditive) * stackMultipliers;
 
     return b;
-  }, [ui.inventory]); // Only recalculate when inventory changes
+  }, [ui.inventory]); 
 
   const [toasts, setToasts] = useState([]);
   const requestRef = useRef();
@@ -764,7 +762,7 @@ export default function App() {
       return true;
     });
 
-    // --- TOAST UPDATE (CHAOS SEQUENCE) ---
+    // --- TOAST UPDATE ---
     state.current.toasts.forEach(t => {
       t.age = (t.age || 0) + 1;
       
@@ -1088,33 +1086,38 @@ export default function App() {
               }
            }
 
-           const bonusText = (profit - BASE_REWARD).toFixed(2);
            const itemRarityColor = safeRarity(item.rarity).text;
 
-           // ALWAYS SHOW SEQUENCE IF PERKS ARE ACTIVE OR ALWAYS FOR UNIFORMITY
            const sequence = [];
-           const activeModifiers = []; 
+           const firstModifiers = [];
+           const middleModifiers = []; 
 
-           if (state.current.inventory['training'] > 0) activeModifiers.push({name: "TRAINING", rarity: 'common'});
+           if (state.current.inventory['training'] > 0) firstModifiers.push({name: "TRAINING", rarity: 'common'});
 
-           if (item.cat === CAT_RECYCLE && state.current.inventory['subsidy'] > 0) activeModifiers.push({name: "SUBSIDY", rarity: 'uncommon'});
-           if (item.cat === CAT_COMPOST && state.current.inventory['grant'] > 0) activeModifiers.push({name: "GRANT", rarity: 'uncommon'});
-           if (item.cat === CAT_TRASH && state.current.inventory['tax'] > 0) activeModifiers.push({name: "TAX CREDIT", rarity: 'uncommon'});
+           if (item.cat === CAT_RECYCLE && state.current.inventory['subsidy'] > 0) middleModifiers.push({name: "SUBSIDY", rarity: 'uncommon'});
+           if (item.cat === CAT_COMPOST && state.current.inventory['grant'] > 0) middleModifiers.push({name: "GRANT", rarity: 'uncommon'});
+           if (item.cat === CAT_TRASH && state.current.inventory['tax'] > 0) middleModifiers.push({name: "TAX CREDIT", rarity: 'uncommon'});
 
            if (currentCount > 0) { 
-              if (state.current.inventory['storage'] > 0) activeModifiers.push({name: "STORAGE", rarity: 'common'});
-              if (state.current.inventory['efficiency'] > 0) activeModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
+              if (state.current.inventory['storage'] > 0) middleModifiers.push({name: "STORAGE", rarity: 'common'});
+              if (state.current.inventory['efficiency'] > 0) middleModifiers.push({name: "EFFICIENCY", rarity: 'legendary'});
            }
 
-           if (state.current.inventory['infra'] > 0) activeModifiers.push({name: "INFRA", rarity: 'legendary'});
-           if (state.current.inventory['combo'] > 0) activeModifiers.push({name: "CASH FLOW", rarity: 'uncommon'}); 
-           if (state.current.inventory['blood'] > 0) activeModifiers.push({name: "BLOOD", rarity: 'lunar'});
-           if (state.current.inventory['fragile'] > 0) activeModifiers.push({name: "FRAGILE", rarity: 'lunar'});
-           if (state.current.inventory['greed'] > 0) activeModifiers.push({name: "GREED", rarity: 'rare'});
-           if (state.current.inventory['void'] > 0) activeModifiers.push({name: "VOID", rarity: 'lunar'});
+           if (state.current.inventory['infra'] > 0) middleModifiers.push({name: "INFRA", rarity: 'legendary'});
+           if (state.current.inventory['combo'] > 0) middleModifiers.push({name: "CASH FLOW", rarity: 'uncommon'}); 
+           if (state.current.inventory['blood'] > 0) middleModifiers.push({name: "BLOOD", rarity: 'lunar'});
+           if (state.current.inventory['fragile'] > 0) middleModifiers.push({name: "FRAGILE", rarity: 'lunar'});
+           if (state.current.inventory['greed'] > 0) middleModifiers.push({name: "GREED", rarity: 'rare'});
+           if (state.current.inventory['void'] > 0) middleModifiers.push({name: "VOID", rarity: 'lunar'});
            
-           if (state.current.inventory['mirror'] > 0) activeModifiers.push({name: "MIRROR", rarity: 'rare'});
-           if (state.current.inventory['acid_vial'] > 0) activeModifiers.push({name: "ACID", rarity: 'toxic'});
+           if (state.current.inventory['mirror'] > 0) middleModifiers.push({name: "MIRROR", rarity: 'rare'});
+           if (state.current.inventory['acid_vial'] > 0) middleModifiers.push({name: "ACID", rarity: 'toxic'});
+           
+           // SHUFFLE THE MIDDLE MODIFIERS
+           middleModifiers.sort(() => 0.5 - Math.random());
+           
+           // COMBINE: Training -> Shuffled Middle
+           const activeModifiers = [...firstModifiers, ...middleModifiers];
            
            activeModifiers.forEach(mod => {
               const modColor = safeRarity(mod.rarity).text;
@@ -1141,7 +1144,6 @@ export default function App() {
               addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
               playSound('success');
            } else {
-              // If profit is negative (crash), we still show the sequence but end with red text
               sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, rot: 0, delay: baseDelay + 15 }); // Added rot: 0
               addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
               playSound('hit');
