@@ -257,6 +257,7 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
   );
 };
 
+// THE FIX IS HERE: Separated position (age) from opacity (life) and removed 'all' from transition
 const ChaosToast = ({ data }) => (
   <div 
     className={`absolute pointer-events-none font-black z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
@@ -265,8 +266,8 @@ const ChaosToast = ({ data }) => (
       top: data.y, 
       fontSize: data.size + 'px',
       opacity: data.life,
-      transition: 'all 0.15s ease-out',
-      transform: `translate(-50%, -${(1.1 - data.life) * 60}px) rotate(${data.rot}deg)` 
+      transition: 'color 0.2s ease, font-size 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+      transform: `translate(-50%, -${data.age * 0.8}px) rotate(${data.rot}deg)` 
     }}
   >
     <div className="flex flex-col items-center">
@@ -761,29 +762,27 @@ export default function App() {
       return true;
     });
 
-    // --- TOAST UPDATE (CHAOS SEQUENCE) ---
+    // --- TOAST UPDATE (THE SECOND HALF OF THE FIX) ---
     state.current.toasts.forEach(t => {
       t.age = (t.age || 0) + 1;
       
       if (t.sequence && t.sequence.length > 0) {
-         // Check if we need to advance sequence
          const nextStage = t.sequence[0];
          if (t.age >= nextStage.delay) {
             t.text = nextStage.text;
             t.color = nextStage.color || t.color;
             t.size = nextStage.size || t.size;
             t.shake = nextStage.shake || false;
-            // CHAOS ROTATION UPDATE: Allows optional specific rotation
             t.rot = nextStage.rot !== undefined ? nextStage.rot : (Math.random() * 20 - 10);
             
             playSound('pop'); 
 
-            t.sequence.shift(); // Remove used stage
-            t.life = Math.min(1.0, t.life + 0.2); // Smooth life boost instead of snap
+            t.sequence.shift(); 
+            // Gives the final pop up enough life to stay visible without bouncing
+            t.life = Math.min(1.0, t.life + 0.3); 
          }
       }
       
-      // MOVED OUTSIDE ELSE: Always animate
       t.life -= 0.015; 
     });
     state.current.toasts = state.current.toasts.filter(t => t.life > 0);
