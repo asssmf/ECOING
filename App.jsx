@@ -1193,7 +1193,7 @@ export default function App() {
 
   return (
     <div 
-      className={`fixed inset-0 w-full h-full font-sans overflow-hidden select-none touch-manipulation`}
+      className={`fixed inset-0 w-full h-full font-sans overflow-hidden select-none touch-manipulation flex justify-center`}
       style={{
         transform: `translate(${(Math.random() - 0.5) * ui.shake}px, ${(Math.random() - 0.5) * ui.shake}px)`
       }}
@@ -1211,7 +1211,7 @@ export default function App() {
         }
       `}} />
       <div className="fixed inset-0 bg-black z-[-10]" />
-      <div className={`relative w-full h-full max-w-lg mx-auto shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+      <div className={`relative w-full h-full max-w-lg shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
         <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] z-0 ${themeClass}`} />
         
         <div className={`absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-30 pointer-events-none ${hudOrder}`}>
