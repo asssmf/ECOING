@@ -257,22 +257,27 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
   );
 };
 
-// THE FIX IS HERE: Separated position (age) from opacity (life) and removed 'all' from transition
+// THE FINAL FIX: 2 divs to completely separate the float from the text animation
 const ChaosToast = ({ data }) => (
   <div 
-    className={`absolute pointer-events-none font-black z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
+    className="absolute pointer-events-none z-50 flex flex-col items-center justify-center"
     style={{ 
       left: data.x, 
       top: data.y, 
-      fontSize: data.size + 'px',
       opacity: data.life,
-      transition: 'color 0.2s ease, font-size 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
-      transform: `translate(-50%, -${data.age * 0.8}px) rotate(${data.rot}deg)` 
+      transform: `translate(-50%, -${data.age * 0.8}px)`, 
     }}
   >
-    <div className="flex flex-col items-center">
-      <span>{data.text}</span>
-      {data.subtext && <span className="text-[10px] opacity-80 mt-1">{data.subtext}</span>}
+    <div 
+      className={`font-black text-center leading-none whitespace-nowrap ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
+      style={{ 
+        fontSize: data.size + 'px',
+        transform: `rotate(${data.rot}deg)`, 
+        transition: 'all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
+      }}
+    >
+      {data.text}
+      {data.subtext && <div className="text-[10px] opacity-80 mt-1">{data.subtext}</div>}
     </div>
   </div>
 );
@@ -390,7 +395,6 @@ export default function App() {
             case 'baseReward': b.baseRewardMul += (perkItem.val * count); break;
             
             case 'stackBonus': stackAdditive += (perkItem.val * count); break;
-            // case 'collapse': stackMultipliers *= Math.pow(2, count); break; // REMOVED OLD LOGIC
             
             case 'catMod': b.catMod[perkItem.target] += (perkItem.val * count); break;
             
@@ -647,8 +651,6 @@ export default function App() {
 
     state.current.lastTime = time;
 
-    // --- MARKET COLLAPSE PENALTY REMOVED (NEW LOGIC IN CLICK) ---
-
     // 1. Spawning
     if (!state.current.bossDying) {
       state.current.spawnTimer++;
@@ -762,7 +764,7 @@ export default function App() {
       return true;
     });
 
-    // --- TOAST UPDATE (THE SECOND HALF OF THE FIX) ---
+    // --- TOAST UPDATE (CHAOS SEQUENCE) ---
     state.current.toasts.forEach(t => {
       t.age = (t.age || 0) + 1;
       
