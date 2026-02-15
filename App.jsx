@@ -772,8 +772,8 @@ export default function App() {
             t.color = nextStage.color || t.color;
             t.size = nextStage.size || t.size;
             t.shake = nextStage.shake || false;
-            // CHAOS ROTATION UPDATE
-            t.rot = Math.random() * 20 - 10; // Randomize angle on every step
+            // CHAOS ROTATION UPDATE: Allows optional specific rotation
+            t.rot = nextStage.rot !== undefined ? nextStage.rot : (Math.random() * 20 - 10);
             
             playSound('pop'); 
 
@@ -1135,11 +1135,11 @@ export default function App() {
            
            // FINAL PROFIT POPUP
            if (profit > 0) {
-              sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, delay: baseDelay + 15 });
+              sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, rot: 0, delay: baseDelay + 15 }); // Added rot: 0
               addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
            } else {
               // If profit is negative (crash), we still show the sequence but end with red text
-              sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, delay: baseDelay + 15 });
+              sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, rot: 0, delay: baseDelay + 15 }); // Added rot: 0
               addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
            }
 
