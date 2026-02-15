@@ -259,7 +259,7 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
 
 const ChaosToast = ({ data }) => (
   <div 
-    className={`fixed pointer-events-none font-black z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
+    className={`absolute pointer-events-none font-black z-50 text-center leading-none ${data.color} ${data.shake ? 'animate-shake-crazy' : ''}`}
     style={{ 
       left: data.x, 
       top: data.y, 
