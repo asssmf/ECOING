@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 // --- GLOBAL SETTINGS ---
-if (!window.ECO_SETTINGS) {
+if (typeof window !== 'undefined' && !window.ECO_SETTINGS) {
   window.ECO_SETTINGS = {
     masterVolume: 0.5,
     sfxVolume: 1.0,
@@ -36,7 +36,7 @@ const SHOP_REROLL_COST = 50;
 
 // --- AUDIO ENGINE ---
 const playSound = (type) => {
-  if (window.ECO_SETTINGS.masterVolume <= 0) return;
+  if (typeof window === 'undefined' || window.ECO_SETTINGS.masterVolume <= 0) return;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -1137,16 +1137,15 @@ export default function App() {
            if (profit > 0) {
               sequence.push({ text: `+$${profit.toFixed(2)}`, color: "text-green-500", size: 30, shake: true, rot: 0, delay: baseDelay + 15 }); // Added rot: 0
               addToast(`+$${BASE_REWARD}`, itemRarityColor, `${item.x}%`, `${item.y}%`, 16, null, sequence);
+              playSound('success');
            } else {
               // If profit is negative (crash), we still show the sequence but end with red text
               sequence.push({ text: `-$${Math.abs(profit).toFixed(2)}`, color: "text-red-500", size: 30, shake: true, rot: 0, delay: baseDelay + 15 }); // Added rot: 0
               addToast(`-$${Math.abs(profit).toFixed(2)}`, "text-red-500", `${item.x}%`, `${item.y}%`, 16, null, sequence);
+              playSound('hit');
            }
 
            state.current.money += profit;
-           
-           if (profit > 0) playSound('success');
-           else playSound('hit'); // Play hit sound on crash
         }
 
         setUi(prev => ({ 
@@ -1199,6 +1198,18 @@ export default function App() {
         transform: `translate(${(Math.random() - 0.5) * ui.shake}px, ${(Math.random() - 0.5) * ui.shake}px)`
       }}
     >
+       <style dangerouslySetInnerHTML={{__html: `
+        html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          overscroll-behavior: none;
+          position: fixed;
+          touch-action: none;
+        }
+      `}} />
       <div className="fixed inset-0 bg-black z-[-10]" />
       <div className={`relative w-full h-full max-w-lg mx-auto shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
         <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] z-0 ${themeClass}`} />
