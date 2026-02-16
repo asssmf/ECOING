@@ -8,7 +8,8 @@ import {
   ZapOff, Vibration, FastForward, Ghost, Anchor, Book, Info,
   Flame, Droplets, Atom, Wind, Target, FileText, Battery,
   Smartphone, Monitor, Sliders, Volume1, Layout, Gem, Snowflake,
-  Home, LogOut, HelpCircle, Shield, TrendingUp, BarChart3, RefreshCw
+  Home, LogOut, HelpCircle, Shield, TrendingUp, BarChart3, RefreshCw,
+  Cloud, Droplet, Factory, CheckCircle
 } from 'lucide-react';
 
 // --- GLOBAL SETTINGS ---
@@ -33,6 +34,53 @@ const BASE_REWARD = 5;
 const STARTING_PENALTY = 10;
 const BASE_SHIELD_PER_ITEM = 0.1;
 const SHOP_REROLL_COST = 50;
+const FLOOR_THRESHOLD = 95; // Hitbox deep inside the white box (sinking effect)
+
+// --- REGULATIONS DB ---
+const REGULATIONS = {
+  1: {
+    title: "MUNICIPAL SORTING ACT",
+    fact: "Did you know? 91% of plastic isn't recycled. Proper sorting is the first step to circular economy.",
+    rule: "BASIC TRAINING: Sort items correctly to fund your facility. Missed items incur penalties.",
+    mechanic: "standard"
+  },
+  2: {
+    title: "ORGANIC FERMENTATION BAN",
+    fact: "Food waste in landfills generates Methane (CH4), a greenhouse gas 25x more potent than CO2.",
+    rule: "NEW HAZARD: Putting Compost in TRASH releases Methane. It blocks vision and speeds up falling items.",
+    mechanic: "methane"
+  },
+  3: {
+    title: "E-WASTE DIRECTIVE",
+    fact: "Electronics contain lead and mercury. One battery can contaminate thousands of liters of groundwater.",
+    rule: "HEAVY METAL LEAK: Missed E-Waste leaks Acid (Shield Dmg) and gives you a TOXIC VIAL.",
+    mechanic: "acid_leak"
+  },
+  4: {
+    title: "POLYMER RIGIDITY LAW",
+    fact: "Rigid plastics (HDPE) take 450+ years to decompose. They occupy huge volume in landfills.",
+    rule: "CRUSH REQUIRED: 'Rigid Plastic' items will appear. You must TAP THEM TWICE to crush them before selecting.",
+    mechanic: "rigid_plastic"
+  },
+  5: {
+    title: "CARBON EMISSIONS CAP",
+    fact: "Every ton of trash incinerated releases tons of CO2. The city has installed emission sensors.",
+    rule: "CARBON TAX: Using TRASH fills the CO2 Meter. Recycling lowers it. If >85%, funds are taxed continuously.",
+    mechanic: "carbon_tax"
+  },
+  6: {
+    title: "CONTAMINATION PROTOCOL",
+    fact: "One greasy pizza box can ruin an entire batch of paper recycling ('Wish-cycling').",
+    rule: "DIRTY ITEMS: 'Contaminated' items (Green Slime) must be TRASHED. Wrong bin = 50% FUND DEDUCTION.",
+    mechanic: "contamination"
+  },
+  7: {
+    title: "EMERGENCY: THE CLOG",
+    fact: "Plastic waste accumulation in drainage systems causes massive urban flooding during monsoons.",
+    rule: "FINAL BOSS: The water level is rising. Trash hits raise the water. Sort correctly to clear the blockage!",
+    mechanic: "flood"
+  }
+};
 
 // --- AUDIO ENGINE ---
 const playSound = (type) => {
@@ -66,6 +114,12 @@ const playSound = (type) => {
       gainNode.gain.setValueAtTime(0.1 * vol, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
       osc.start(now); osc.stop(now + 0.1);
     }
+    else if (type === 'crack') { 
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now);
+      osc.frequency.linearRampToValueAtTime(50, now + 0.05);
+      gainNode.gain.setValueAtTime(0.2 * vol, now); gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now); osc.stop(now + 0.1);
+    }
     else if (type === 'success') { 
       osc.type = 'sine'; osc.frequency.setValueAtTime(800, now);
       osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
@@ -81,6 +135,12 @@ const playSound = (type) => {
       osc.type = 'square'; osc.frequency.setValueAtTime(400, now);
       gainNode.gain.setValueAtTime(0.1 * vol, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
       osc.start(now); osc.stop(now + 0.1);
+    }
+    else if (type === 'splash') { 
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(300, now);
+      osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+      gainNode.gain.setValueAtTime(0.2 * vol, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+      osc.start(now); osc.stop(now + 0.3);
     }
     else if (type === 'attack') { 
       osc.type = 'square'; osc.frequency.setValueAtTime(200, now);
@@ -105,7 +165,6 @@ const playSound = (type) => {
     }
     else if (type === 'pop') { 
       osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now);
-      // LOUD POP
       gainNode.gain.setValueAtTime(0.9 * vol, now); 
       gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
       osc.start(now); osc.stop(now + 0.1);
@@ -231,7 +290,7 @@ const PERK_DESCRIPTIONS = {
 
 // --- COMPONENTS ---
 
-const Bin = ({ category, onClick, isTarget, shake }) => {
+const Bin = ({ category, onClick, isTarget, shake, float }) => {
   const config = {
     [CAT_RECYCLE]: { color: 'bg-blue-500 border-blue-700', icon: <Recycle className="text-white" size={28} />, label: "RECYCLE" },
     [CAT_COMPOST]: { color: 'bg-green-500 border-green-700', icon: <Leaf className="text-white" size={28} />, label: "COMPOST" },
@@ -244,14 +303,15 @@ const Bin = ({ category, onClick, isTarget, shake }) => {
     <button 
       onPointerDown={(e) => { e.preventDefault(); onClick(category); }}
       className={`
-        relative w-full h-28 rounded-t-2xl border-b-8 flex flex-col items-center justify-center 
-        transition-all duration-75 active:scale-95 shadow-xl select-none
+        relative w-full h-24 rounded-xl border-b-4 flex flex-col items-center justify-center 
+        transition-all duration-75 active:scale-95 shadow-lg select-none z-30
         ${color}
-        ${isTarget ? 'ring-4 ring-yellow-400 scale-105 z-20 brightness-110' : ''}
+        ${isTarget ? 'ring-4 ring-yellow-400 scale-105 brightness-110' : ''}
         ${shake ? 'animate-shake-crazy' : ''}
+        ${float ? 'animate-float' : ''}
       `}
     >
-      <div className="mb-1 drop-shadow-md">{icon}</div>
+      <div className="mb-1">{icon}</div>
       <span className="text-[10px] font-black text-white tracking-widest uppercase">{label}</span>
     </button>
   );
@@ -300,6 +360,8 @@ export default function App() {
     inventory: {}, // { itemId: count }
     selectedUid: null,
     gameOver: false,
+    gameWon: false,
+    gameLostByFlood: false,
     shopOpen: false,
     menu: 'start',
     baseLuck: 1.0, 
@@ -312,7 +374,15 @@ export default function App() {
     freezerTimer: 0,
     shield: 0, 
     maxShield: 0,
-    collapseTimer: 0
+    collapseTimer: 0,
+    // Regulation States
+    methaneFog: 0,
+    methaneSpeedMult: 1.0,
+    carbonMeter: 0,
+    floodLevel: 0,
+    endlessMode: false,
+    showRegulation: false, 
+    acidPuddles: []
   });
 
   const [ui, setUi] = useState({
@@ -328,6 +398,8 @@ export default function App() {
     items: [],
     selectedUid: null,
     gameOver: false,
+    gameWon: false,
+    gameLostByFlood: false,
     shopOpen: false,
     menu: 'start',
     bankruptcyLimit: STARTING_BANKRUPTCY_LIMIT,
@@ -349,7 +421,15 @@ export default function App() {
     spawnRateMult: 1,
     settingsKey: 0,
     shield: 0,
-    maxShield: 0
+    maxShield: 0,
+    // Regulation UI
+    showRegulation: false,
+    currentRegulation: null,
+    methaneFog: 0,
+    carbonMeter: 0,
+    floodLevel: 0,
+    endlessMode: false,
+    acidPuddles: []
   });
 
   // Calculate buffs derived from state
@@ -475,7 +555,7 @@ export default function App() {
     });
 
     const selected = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 3; i > 0; i--) {
       if (pool.length === 0) break;
       const total = pool.reduce((a, b) => a + b.weight, 0);
       let r = Math.random() * total;
@@ -503,7 +583,7 @@ export default function App() {
     const startMoney = ui.cheatMoney !== 0 ? parseFloat(ui.cheatMoney) : 0;
     const startLuck = ui.cheatLuck !== 1.0 ? parseFloat(ui.cheatLuck) : 1.0;
     const startLimit = ui.cheatLimit !== -200 ? parseFloat(ui.cheatLimit) : STARTING_BANKRUPTCY_LIMIT;
-    const startTimer = ui.cheatBossTime;
+    const startTimer = parseFloat(ui.cheatBossTime) || BOSS_TIMER_DURATION;
 
     state.current = {
       ...state.current,
@@ -517,14 +597,13 @@ export default function App() {
       bossActive: false,
       bossHealth: 100,
       bossMaxHealth: 100,
-      bossTrait: 'none',
-      bossDying: false,
-      spawnTimer: 0,
-      bossTimer: startTimer,
+      bossTrait: 'none', 
+      selectedUid: null,
       gameOver: false,
+      gameWon: false,
+      gameLostByFlood: false,
       shopOpen: false,
       menu: 'none',
-      selectedUid: null,
       baseLuck: startLuck,
       shopSelection: [],
       lastTime: performance.now(),
@@ -535,7 +614,14 @@ export default function App() {
       freezerTimer: 0,
       shield: 0,
       maxShield: 0,
-      collapseTimer: 0
+      collapseTimer: 0,
+      methaneFog: 0,
+      methaneSpeedMult: 1.0,
+      carbonMeter: 0,
+      floodLevel: 0,
+      showRegulation: true, // Show first reg on start
+      endlessMode: false,
+      acidPuddles: []
     };
     
     setUi(prev => ({ 
@@ -546,6 +632,8 @@ export default function App() {
       bossActive: false, 
       menu: 'none', 
       gameOver: false,
+      gameWon: false,
+      gameLostByFlood: false,
       inventory: {},
       items: [],
       currentLuck: startLuck,
@@ -556,7 +644,14 @@ export default function App() {
       bossTimer: startTimer,
       bankruptcyLimit: startLimit,
       shield: 0,
-      maxShield: 0
+      maxShield: 0,
+      showRegulation: true, // Show first reg
+      currentRegulation: REGULATIONS[1],
+      methaneFog: 0,
+      carbonMeter: 0,
+      floodLevel: 0,
+      endlessMode: false,
+      acidPuddles: []
     }));
 
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
@@ -567,9 +662,26 @@ export default function App() {
     let newItem;
     let isPerk = false;
     let isHazard = false;
+    let isHardPlastic = false;
+    let isContaminated = false;
+
+    // REGULATION SPAWN MODIFIERS (STACKING)
+    const activeWave = state.current.wave;
     
+    // Wave 3: E-Waste Boost
+    const eWasteBoost = activeWave >= 3 ? 0.3 : 0; 
+    
+    // Wave 4: Rigid Plastic
+    const rigidChance = activeWave >= 4 ? 0.3 : 0;
+
+    // Wave 6: Contamination
+    const contamChance = activeWave >= 6 ? 0.25 : 0;
+
     if (state.current.bossActive) {
-      if (state.current.bossTrait === 'acid') {
+      if (state.current.bossTrait === 'flood') {
+         // During Flood Boss, spawn lots of trash
+         newItem = BOSS_ITEMS[Math.floor(Math.random() * BOSS_ITEMS.length)];
+      } else if (state.current.bossTrait === 'acid') {
          if (Math.random() < 0.75) {
             newItem = ACID_ITEM;
          } else {
@@ -599,14 +711,37 @@ export default function App() {
         newItem = HAZARD_ITEM;
         isHazard = true;
       } else {
-        const totalLuck = state.current.baseLuck + activeBuffs.luckAdd;
-        const perkChance = Math.min(0.10, 0.01 * totalLuck); 
-        
-        if (Math.random() < perkChance) {
-          isPerk = true;
-          newItem = PERK_DB[Math.floor(Math.random() * PERK_DB.length)];
-        } else {
-          newItem = getWeightedItem(WASTE_DB, totalLuck);
+        // Special Regulation Spawning
+        const rand = Math.random();
+
+        if (rand < eWasteBoost) {
+           // Force spawn e-waste
+           const eWaste = WASTE_DB.filter(i => ['battery', 'smartwatch', 'laptop'].includes(i.id));
+           newItem = eWaste[Math.floor(Math.random() * eWaste.length)];
+        } 
+        else if (rand < eWasteBoost + rigidChance) {
+           // Rigid Plastic Logic
+           const plastics = WASTE_DB.filter(i => i.cat === CAT_RECYCLE && i.id !== 'paper'); // Paper isn't plastic
+           newItem = plastics[Math.floor(Math.random() * plastics.length)];
+           isHardPlastic = true;
+        }
+        else if (rand < eWasteBoost + rigidChance + contamChance) {
+           // Contaminated Logic
+           const recycles = WASTE_DB.filter(i => i.cat === CAT_RECYCLE);
+           newItem = recycles[Math.floor(Math.random() * recycles.length)];
+           isContaminated = true;
+        }
+        else {
+           // Normal Spawn
+           const totalLuck = state.current.baseLuck + activeBuffs.luckAdd;
+           const perkChance = Math.min(0.10, 0.01 * totalLuck); 
+           
+           if (Math.random() < perkChance) {
+             isPerk = true;
+             newItem = PERK_DB[Math.floor(Math.random() * PERK_DB.length)];
+           } else {
+             newItem = getWeightedItem(WASTE_DB, totalLuck);
+           }
         }
       }
     }
@@ -616,12 +751,16 @@ export default function App() {
     if (state.current.bossTrait === 'iron') variance = 0.5;
     if (state.current.bossTrait === 'sniper') variance = 3.0; 
     if (state.current.bossTrait === 'swarm') variance = 0.4;
+    if (state.current.bossTrait === 'flood') variance = 1.2; // Flood items fall slightly faster
 
     const baseSpeed = state.current.bossActive ? 0.35 : 0.15;
     const waveMod = state.current.wave * 0.05; 
     let chaosMult = window.ECO_SETTINGS.chaos ? 2.0 : 1.0;
 
-    const finalSpeed = (baseSpeed + waveMod) * activeBuffs.fallSpeedMul * variance * chaosMult;
+    // Apply Methane Leak Speed Multiplier
+    const methaneMult = state.current.methaneSpeedMult || 1.0;
+
+    const finalSpeed = (baseSpeed + waveMod) * activeBuffs.fallSpeedMul * variance * chaosMult * methaneMult;
 
     let opacity = 1.0;
     if (state.current.bossTrait === 'phantom') opacity = 0.3 + (Math.random() * 0.4);
@@ -637,12 +776,16 @@ export default function App() {
       isHazard: isHazard,
       opacity: opacity,
       isGambler: state.current.bossTrait === 'gambler',
-      gamblerTimer: 0
+      gamblerTimer: 0,
+      isHardPlastic, // Requires 2 taps
+      isContaminated, // Must be trashed
+      crackCount: 0 // For hard plastic
     });
   };
 
   const update = (time) => {
-    if (state.current.menu !== 'none' || state.current.shopOpen || state.current.gameOver) {
+    // PAUSE CHECK - Now uses state.current.showRegulation to guarantee loop pause
+    if (state.current.menu !== 'none' || state.current.shopOpen || state.current.gameOver || state.current.gameWon || state.current.showRegulation) {
       state.current.lastTime = time; 
       return; 
     }
@@ -657,11 +800,15 @@ export default function App() {
       
       if (state.current.bossTrait === 'swarm') baseRate = 10; 
       if (state.current.bossTrait === 'sniper') baseRate = 120; 
+      if (state.current.bossTrait === 'flood') baseRate = 30; // Fast spawn during flood
       
       let chaosRate = window.ECO_SETTINGS.chaos ? 0.5 : 1.0;
       let cheatRate = 1.0 / ui.spawnRateMult; 
+      
+      // Methane acceleration affects spawn rate too (harder)
+      let methaneRate = 1.0 / (state.current.methaneSpeedMult || 1.0);
 
-      let finalRate = (baseRate / activeBuffs.spawnRateMul) * chaosRate * cheatRate;
+      let finalRate = (baseRate / activeBuffs.spawnRateMul) * chaosRate * cheatRate * methaneRate;
 
       if (state.current.spawnTimer > finalRate) {
         spawnItem(activeBuffs);
@@ -675,7 +822,28 @@ export default function App() {
       if (state.current.bossTimer <= 0) startBoss(activeBuffs);
     }
 
-    // 3. Glitch Boss Logic
+    // 2.5 Regulation Effects (STACKING CHECKS)
+    if (state.current.wave >= 5 && !state.current.bossActive) { // Carbon Tax Logic (Wave 5+)
+       if (state.current.carbonMeter >= 85) { // 85% Threshold
+          // TAX: 0.1% of total funds per frame (~6% per second)
+          state.current.money -= Math.max(0.01, state.current.money * 0.001);
+       }
+    }
+
+    if (state.current.methaneFog > 0) {
+       state.current.methaneFog -= 0.2; // Fade fog
+    }
+    
+    // Acid Puddle Cleanup
+    if (state.current.acidPuddles.length > 0) {
+        state.current.acidPuddles = state.current.acidPuddles.filter(p => {
+            p.life -= 0.005;
+            return p.life > 0;
+        });
+    }
+
+    // 3. Boss Logics
+    // Glitch Boss
     if (state.current.bossTrait === 'glitch' && !state.current.bossDying) {
         state.current.glitchTimer++;
         if (state.current.glitchTimer > 400 && state.current.glitchTimer < 500) {
@@ -691,7 +859,7 @@ export default function App() {
         }
     }
 
-    // 4. Quantum Boss Logic
+    // Quantum Boss
     if (state.current.bossTrait === 'quantum' && !state.current.bossDying) {
        if (state.current.spawnTimer % 30 === 0 && state.current.items.length > 0) {
           const idx = Math.floor(Math.random() * state.current.items.length);
@@ -701,7 +869,7 @@ export default function App() {
        }
     }
 
-    // 5. Freezer Boss Logic (NERFED TO 1.05x)
+    // Freezer Boss
     let freezeMult = 1.0;
     if (state.current.bossTrait === 'freezer' && !state.current.bossDying) {
         state.current.freezerTimer++;
@@ -744,16 +912,50 @@ export default function App() {
 
       item.y += item.speed * speedMult * freezeMult; 
       
-      if (item.y > 105) {
+      // Hit Floor Logic (Threshold is deep inside the box)
+      if (item.y > FLOOR_THRESHOLD) {
         if (!state.current.bossDying) { 
           if (item.isHazard) {
             addToast("SAFE", "text-slate-400", `${item.x}%`, "90%", 20);
           } else {
-            let rawPenalty = item.isBossItem ? state.current.penalty * 1.5 : state.current.penalty;
-            rawPenalty *= activeBuffs.penaltyMul;
-            let finalPenalty = rawPenalty;
-            if (!activeBuffs.shieldsDisabled) finalPenalty = Math.max(0, finalPenalty - activeBuffs.flatShield);
-            applyPenalty(finalPenalty);
+            // FLOOD BOSS SPECIAL DAMAGE
+            if (state.current.bossTrait === 'flood') {
+                state.current.floodLevel += 5; // Raise water
+                playSound('splash');
+                if (state.current.floodLevel >= 100) {
+                    state.current.gameOver = true;
+                    state.current.gameLostByFlood = true; // Mark as flood death
+                    setUi(prev => ({ ...prev, gameOver: true, gameLostByFlood: true }));
+                }
+            } else {
+                // REGULATION: ACID LEAK (Wave 3+)
+                if (state.current.wave >= 3 && ['battery', 'smartwatch', 'laptop'].includes(item.id)) {
+                    state.current.maxShield = Math.max(0, state.current.maxShield - 2); // Permanent damage
+                    state.current.acidPuddles.push({x: item.x, life: 1.0, id: Date.now()}); // Add visual puddle
+                    
+                    // NEW MECHANIC: Gives Acid Vial
+                    const currentVials = state.current.inventory['acid_vial'] || 0;
+                    state.current.inventory['acid_vial'] = currentVials + 1;
+                    addToast("+ACID VIAL", "text-lime-300", "50%", "50%", 20);
+                    // Sync inventory to UI immediately to avoid lag
+                    setUi(prev => ({...prev, inventory: {...state.current.inventory}}));
+
+                    playSound('explode');
+                }
+
+                let rawPenalty = item.isBossItem ? state.current.penalty * 1.5 : state.current.penalty;
+                rawPenalty *= activeBuffs.penaltyMul;
+                let finalPenalty = rawPenalty;
+                
+                // CONTAMINATION MISS PENALTY (Wave 6+)
+                if (state.current.wave >= 6 && item.isContaminated) {
+                    finalPenalty = Math.max(50, Math.floor(state.current.money * 0.5)); // 50% fund deduction if miss
+                    addToast("TOXIC LEAK!", "text-green-500", `${item.x}%`, "90%", 25);
+                }
+
+                if (!activeBuffs.shieldsDisabled) finalPenalty = Math.max(0, finalPenalty - activeBuffs.flatShield);
+                applyPenalty(finalPenalty);
+            }
           }
         }
         if (state.current.selectedUid === item.uid) state.current.selectedUid = null;
@@ -794,10 +996,11 @@ export default function App() {
       state.current.shake *= 0.9;
     }
 
-    // --- RECALCULATE MAX SHIELD EACH FRAME ---
-    const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
-    const newMaxShield = totalItems * BASE_SHIELD_PER_ITEM; 
-    state.current.maxShield = newMaxShield;
+    // --- RECALCULATE MAX SHIELD EACH FRAME (Unless Acid Damage) ---
+    if (state.current.regulation?.mechanic !== 'acid_leak') {
+        const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
+        state.current.shield = totalItems * BASE_SHIELD_PER_ITEM;
+    }
 
     setUi(prev => ({
       ...prev,
@@ -817,6 +1020,11 @@ export default function App() {
       bossDying: state.current.bossDying,
       shield: state.current.shield,
       maxShield: state.current.maxShield,
+      methaneFog: state.current.methaneFog,
+      carbonMeter: state.current.carbonMeter,
+      floodLevel: state.current.floodLevel,
+      acidPuddles: [...state.current.acidPuddles],
+      gameLostByFlood: state.current.gameLostByFlood
     }));
     
     setToasts([...state.current.toasts]);
@@ -864,8 +1072,16 @@ export default function App() {
     let hp = state.current.bossMaxHealth;
     if (buffs.bossRisk) hp = Math.floor(hp * 1.5);
     
-    const traits = ['none', 'glitch', 'rush', 'phantom', 'iron', 'acid', 'quantum', 'swarm', 'sniper', 'gambler', 'mimic', 'freezer'];
-    let trait = ui.forceBoss !== 'random' ? ui.forceBoss : (state.current.wave > 1 ? traits[Math.floor(Math.random() * traits.length)] : 'none');
+    // BOSS SELECTION LOGIC
+    let trait = 'none';
+    
+    // Wave 7 is ALWAYS The Flood unless endless mode
+    if (state.current.wave === 7 && !state.current.endlessMode) {
+        trait = 'flood';
+    } else {
+        const traits = ['none', 'glitch', 'rush', 'phantom', 'iron', 'acid', 'quantum', 'swarm', 'sniper', 'gambler', 'mimic', 'freezer'];
+        trait = ui.forceBoss !== 'random' ? ui.forceBoss : (state.current.wave > 1 ? traits[Math.floor(Math.random() * traits.length)] : 'none');
+    }
     
     state.current.bossTrait = trait;
     state.current.bossHealth = hp;
@@ -885,6 +1101,7 @@ export default function App() {
     if (trait === 'gambler') bossName = "THE GAMBLER";
     if (trait === 'mimic') bossName = "THE MIMIC";
     if (trait === 'freezer') bossName = "ABSOLUTE ZERO";
+    if (trait === 'flood') { bossName = "THE CLOG"; state.current.bossHealth *= 2; state.current.bossMaxHealth *= 2; } // Flood boss is tanky
 
     addToast(bossName, "text-red-600", "50%", "30%", 40, "WAVE " + state.current.wave);
   };
@@ -897,6 +1114,15 @@ export default function App() {
     playSound('explode');
     addToast("TARGET DESTROYED", "text-red-500", "50%", "50%", 40);
     
+    // If it was the Wave 7 flood boss, win game!
+    if (state.current.bossTrait === 'flood' && !state.current.endlessMode) {
+        setTimeout(() => {
+            state.current.gameWon = true;
+            setUi(p => ({...p, gameWon: true}));
+        }, 1000);
+        return;
+    }
+
     setUi(p => ({...p, bossDying: true}));
 
     setTimeout(() => {
@@ -907,12 +1133,13 @@ export default function App() {
   const openShop = () => {
     state.current.bossActive = false;
     state.current.bossDying = false;
-    state.current.bossTimer = ui.cheatBossTime || BOSS_TIMER_DURATION;
+    state.current.bossTimer = parseFloat(ui.cheatBossTime) || BOSS_TIMER_DURATION;
     state.current.bossTrait = 'none';
     state.current.binOrder = [CAT_RECYCLE, CAT_COMPOST, CAT_TRASH]; 
     state.current.wave += 1;
     state.current.baseLuck += 0.1; 
     state.current.penalty += 5; 
+    state.current.methaneSpeedMult = 1.0; // Reset methane speed penalty every wave
     
     // THE CHANGE: Increase Bankruptcy Limit (Make it harder)
     state.current.bankruptcyBase += BANKRUPTCY_INCREASE_PER_WAVE;
@@ -922,9 +1149,23 @@ export default function App() {
     state.current.glitchTimer = 0;
     state.current.freezerTimer = 0;
     
+    // RESET FLOOD LEVEL ALWAYS
+    state.current.floodLevel = 0;
+
+    // ENDLESS MODE FIX: Only look for regulations if they exist
+    const safeReg = REGULATIONS[state.current.wave] || null; // Use null if undefined
+    if (safeReg && !state.current.endlessMode) {
+        state.current.regulation = safeReg;
+        // Don't show regulation yet, wait for player to click start
+    } else {
+        state.current.regulation = null; 
+    }
+    
     // REGEN SHIELD
-    const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
-    state.current.shield = totalItems * BASE_SHIELD_PER_ITEM;
+    if (state.current.regulation?.mechanic !== 'acid_leak') {
+        const totalItems = Object.values(state.current.inventory).reduce((a, b) => a + b, 0);
+        state.current.shield = totalItems * BASE_SHIELD_PER_ITEM;
+    }
 
     const buffs = activeBuffs; // Use current buffs for reward calc
     let reward = 100 * state.current.wave;
@@ -935,6 +1176,11 @@ export default function App() {
     state.current.shopSelection = getShopSelection(state.current.baseLuck + buffs.luckAdd);
 
     state.current.shopOpen = true;
+    
+    // ENDLESS MODE CRASH FIX: Ensure gameWon is false
+    state.current.gameWon = false;
+    state.current.bossActive = false; // FIX FLASH
+
     setUi(prev => ({ 
       ...prev, 
       shopOpen: true, 
@@ -943,7 +1189,11 @@ export default function App() {
       penalty: state.current.penalty,
       money: state.current.money,
       binOrder: state.current.binOrder,
-      bossDying: false
+      bossDying: false,
+      showRegulation: false, // Ensure it's hidden initially
+      floodLevel: 0, // Ensure UI updates
+      gameWon: false,
+      bossActive: false // Fix Flash
     }));
   };
 
@@ -998,6 +1248,17 @@ export default function App() {
       return;
     }
 
+    // REGULATION: HARD PLASTICS (Wave 4+)
+    if (item.isHardPlastic && item.crackCount < 1) {
+       item.crackCount++;
+       playSound('crack'); // You'll need to add a crack sound or reuse 'hit'
+       item.rotation += 15;
+       // Shake item visually by offsetting x slightly (handled in render loop usually, but here we just update x)
+       item.x += (Math.random() - 0.5) * 5;
+       addToast("CRACK!", "text-yellow-400", `${item.x}%`, `${item.y}%`, 20);
+       return; // DO NOT SELECT YET
+    }
+
     state.current.selectedUid = item.uid;
     setUi(prev => ({ ...prev, selectedUid: item.uid }));
     playSound('select');
@@ -1011,10 +1272,48 @@ export default function App() {
     if (!item) return;
 
     const buffs = activeBuffs; // Use optimized buffs
+    const isCorrect = item.cat === binCategory;
+
+    // REGULATION LOGIC: CONTAMINATION (Wave 6+)
+    if (item.isContaminated) {
+       // Must be Trashed. If Recycled/Composted -> Penalty
+       if (binCategory !== CAT_TRASH) {
+           addToast("CONTAMINATED!", "text-green-600", "50%", "50%", 30);
+           
+           // HUGE PENALTY (50% of current funds)
+           const fine = Math.max(50, Math.floor(state.current.money * 0.5));
+           applyPenalty(fine);
+           
+           state.current.items = state.current.items.filter(i => i.uid !== selectedUid);
+           state.current.selectedUid = null;
+           setUi(prev => ({ ...prev, selectedUid: null }));
+           return;
+       } else {
+           // Successfully trashed contaminated item -> SAFE DISPOSAL -> INCREASE CO2
+           addToast("SAFE DISPOSAL", "text-slate-500", "50%", "50%", 20);
+           playSound('success');
+           
+           if (state.current.wave >= 5) {
+               state.current.carbonMeter = Math.min(100, state.current.carbonMeter + 15); // +15% penalty
+               addToast("+CO2", "text-red-400", "80%", "20%", 15);
+           }
+
+           state.current.items = state.current.items.filter(i => i.uid !== selectedUid);
+           state.current.selectedUid = null;
+           setUi(prev => ({ ...prev, selectedUid: null }));
+           return;
+       }
+    }
 
     if (item.cat === binCategory) {
       if (item.isBossItem) {
-        let dmg = Math.max(1, 10 + buffs.bossDmgFlat); 
+        // BOSS DAMAGE SCALING
+        let bossDmgBase = 10 + buffs.bossDmgFlat;
+        // Apply Stack Multipliers (Efficiency / Void Prism) to Boss Damage
+        // This makes "Economy" builds viable for boss killing
+        let scaledDmg = bossDmgBase * buffs.stackMul;
+        
+        let dmg = Math.max(1, scaledDmg);
         
         if (item.id === 'acid_vial') {
            dmg = 1; // Force 1 damage for acid vials to prevent confusion
@@ -1028,6 +1327,12 @@ export default function App() {
         }
         
         playSound('attack');
+        
+        // FLOOD BOSS MECHANIC: Damage lowers water level
+        if (state.current.bossTrait === 'flood') {
+            state.current.floodLevel = Math.max(0, state.current.floodLevel - 5);
+        }
+
         state.current.bossHealth -= dmg;
         
         if (item.id === 'acid_vial') {
@@ -1045,6 +1350,12 @@ export default function App() {
            triggerBossDeath();
         }
       } else {
+        // REGULATION LOGIC: CARBON CAP (Wave 5+)
+        if (state.current.wave >= 5) {
+            if (binCategory === CAT_TRASH) state.current.carbonMeter = Math.min(100, state.current.carbonMeter + 4); // Adjusted to +4
+            else state.current.carbonMeter = Math.max(0, state.current.carbonMeter - 2); 
+        }
+
         const currentCount = state.current.inventory[item.id] || 0;
         state.current.inventory[item.id] = currentCount + 1;
         
@@ -1158,6 +1469,17 @@ export default function App() {
         }));
       }
     } else {
+      // WRONG BIN
+      
+      // REGULATION: METHANE (Wave 2+)
+      if (state.current.wave >= 2 && item.cat === CAT_COMPOST && binCategory === CAT_TRASH) {
+          state.current.methaneFog = 100; // Trigger visual fog
+          state.current.methaneSpeedMult += 0.2; // SPEED INCREASE MECHANIC
+          addToast("METHANE LEAK!", "text-lime-400", "50%", "50%", 30);
+          // Sync UI just in case logic depends on it
+          setUi(p => ({...p, methaneFog: 100})); 
+      }
+
       let rawPenalty = state.current.penalty * buffs.penaltyMul;
       if (!buffs.shieldsDisabled) rawPenalty = Math.max(0, rawPenalty - buffs.flatShield);
       applyPenalty(rawPenalty);
@@ -1194,6 +1516,7 @@ export default function App() {
 
   const themeClass = window.ECO_SETTINGS.theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-b from-sky-100 to-white';
   const hudOrder = window.ECO_SETTINGS.leftHanded ? 'flex-row-reverse' : 'flex-row';
+  const isDark = window.ECO_SETTINGS.theme === 'dark';
 
   return (
     <div 
@@ -1218,14 +1541,35 @@ export default function App() {
       <div className={`relative w-full h-full max-w-lg shadow-2xl overflow-hidden ${window.ECO_SETTINGS.theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
         <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] z-0 ${themeClass}`} />
         
+        {/* --- REGULATION VISUALS --- */}
+        {/* Methane Fog (Wave 2) */}
+        <div className="fixed inset-0 bg-gradient-to-t from-lime-500/90 to-transparent pointer-events-none z-[60]" style={{opacity: ui.methaneFog / 100}}></div>
+        
+        {/* Acid Puddles (Wave 3) */}
+        {ui.acidPuddles.map(p => (
+            <div key={p.id} className="absolute bottom-28 w-20 h-8 bg-lime-400/50 rounded-[100%] blur-sm pointer-events-none transition-opacity z-10" style={{left: `${p.x}%`, transform: 'translate(-50%)', opacity: p.life}}></div>
+        ))}
+
+        {/* Flood Water (Wave 7) */}
+        <div className="absolute bottom-0 w-full bg-blue-500/80 border-t-4 border-blue-400 pointer-events-none z-[25] transition-all duration-300" style={{height: `${ui.floodLevel}%`}}>
+            <div className="w-full text-center text-white font-black text-xs pt-2 animate-pulse">FLOOD LEVEL: {ui.floodLevel}%</div>
+        </div>
+
+        {/* --- HITBOX VISUAL (Solid White Box) --- */}
+        <div className={`absolute w-full h-[20%] bottom-0 z-10 pointer-events-none shadow-inner ${isDark ? 'bg-slate-800' : 'bg-white'}`}></div>
+
         <div className={`absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-30 pointer-events-none ${hudOrder}`}>
           <div className="flex flex-col gap-2 pointer-events-auto">
-            <div className={`px-4 py-2 rounded-xl shadow-lg border-2 flex flex-col transition-colors bg-white border-white ${ui.money < 0 ? 'border-red-400 bg-red-50' : ''}`}>
-               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex justify-between">
+            {/* MONEY BOX */}
+            <div className={`px-4 py-2 rounded-xl shadow-lg border-2 flex flex-col transition-colors bg-white border-white 
+               ${ui.money < 0 ? 'border-red-400 bg-red-50' : ''} 
+               ${ui.carbonMeter >= 85 ? '!bg-red-50 !border-red-400 animate-pulse text-red-900' : ''}
+            `}>
+               <span className={`text-[10px] font-bold uppercase tracking-wider flex justify-between ${ui.carbonMeter >= 85 ? 'text-white' : 'text-slate-500'}`}>
                  <span>FUNDS</span>
-                 <span className="text-blue-500 flex items-center gap-1"><Shield size={10}/> {ui.shield.toFixed(1)}</span>
+                 <span className={`${ui.carbonMeter >= 85 ? 'text-white' : 'text-blue-500'} flex items-center gap-1`}><Shield size={10}/> {ui.shield.toFixed(1)}</span>
                </span>
-               <div className={`flex items-center text-xl font-black ${ui.money < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+               <div className={`flex items-center text-xl font-black ${ui.carbonMeter >= 85 ? 'text-white' : (ui.money < 0 ? 'text-red-600' : 'text-slate-800')}`}>
                  <DollarSign size={18} strokeWidth={3} />
                  {ui.money.toFixed(2)}
                </div>
@@ -1249,6 +1593,19 @@ export default function App() {
               <button onClick={skipWave} className="bg-red-500 text-white font-black text-xs py-2 px-3 rounded shadow animate-pulse pointer-events-auto">
                 SKIP WAVE ⏭
               </button>
+            )}
+            
+            {/* CARBON METER (Wave 5+) */}
+            {ui.wave >= 5 && !ui.bossActive && (
+               <div className="bg-slate-800 p-2 rounded-xl border border-slate-600 w-32 shadow-lg">
+                  <div className="text-[8px] text-slate-400 font-bold flex justify-between mb-1">
+                     <span>CO2 EMISSIONS</span>
+                     <span className={ui.carbonMeter > 85 ? 'text-red-500 animate-pulse' : 'text-green-500'}>{ui.carbonMeter}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                     <div className={`h-full transition-all duration-300 ${ui.carbonMeter > 85 ? 'bg-red-500' : 'bg-gradient-to-r from-green-500 to-yellow-500'}`} style={{width: `${ui.carbonMeter}%`}}></div>
+                  </div>
+               </div>
             )}
           </div>
 
@@ -1309,6 +1666,7 @@ export default function App() {
                     if (ui.bossTrait === 'mimic') key = 'THE MIMIC';
                     if (ui.bossTrait === 'freezer') key = 'ABSOLUTE ZERO';
                     if (ui.bossTrait === 'iron') key = 'IRON CLAD';
+                    if (ui.bossTrait === 'flood') key = 'THE CLOG';
                     return key;
                  })()}
              </div>
@@ -1338,7 +1696,7 @@ export default function App() {
         )}
 
         <div 
-          className="absolute inset-0 z-10" 
+          className="absolute inset-0 z-0" 
           onPointerDown={() => {
              state.current.selectedUid = null;
              setUi(prev => ({...prev, selectedUid: null}));
@@ -1366,14 +1724,18 @@ export default function App() {
                )}
                
                <div className={`
-                 w-full h-full rounded-xl shadow-md border-b-4 flex items-center justify-center text-3xl bg-white text-slate-900
+                 w-full h-full rounded-xl shadow-lg border-b-4 flex items-center justify-center text-3xl bg-white text-slate-900 overflow-hidden relative
                  ${ui.selectedUid === item.uid ? 'border-yellow-400 bg-yellow-50' : item.isHazard ? 'border-lime-500 bg-lime-100 animate-pulse' : 'border-slate-200'}
                  ${item.isBossItem ? 'bg-red-50 border-red-200' : ''}
                  ${item.isPerkDrop ? 'ring-4 ring-purple-400 bg-purple-50 animate-pulse' : ''}
                  ${item.id === 'acid_vial' ? 'ring-4 ring-lime-400 bg-lime-100' : ''}
+                 ${item.isHardPlastic && item.crackCount < 1 ? 'border-slate-500 bg-slate-200' : ''} 
                `}>
                  {item.icon}
+                 {item.isContaminated && <div className="absolute inset-0 bg-lime-500/30 flex items-center justify-center animate-pulse"><div className="text-lime-800 text-[8px] font-black bg-lime-200 px-1 rounded transform -rotate-12">DIRTY</div></div>}
+                 {item.isHardPlastic && item.crackCount < 1 && <div className="absolute inset-0 flex items-center justify-center bg-slate-900/10"><div className="text-slate-800 text-[8px] font-black bg-white px-1 border border-black transform rotate-12">HARD</div></div>}
                </div>
+               
                {item.isPerkDrop && (
                  <div className="bg-purple-600 text-white text-[9px] px-2 rounded-full -mt-2 z-10 font-bold uppercase tracking-wider shadow-sm">
                    PERK
@@ -1390,7 +1752,8 @@ export default function App() {
 
         {toasts.map(t => <ChaosToast key={t.id} data={t} />)}
 
-        <div className="absolute bottom-0 w-full flex gap-2 px-2 pb-2 z-20 transition-all duration-300">
+        {/* BINS (ABOVE BOX) */}
+        <div className="absolute bottom-[2%] w-full flex gap-2 px-2 pb-2 z-30 transition-all duration-300">
           {ui.binOrder.map((cat, idx) => (
             <div key={idx} className="flex-1">
               <Bin 
@@ -1398,6 +1761,7 @@ export default function App() {
                 onClick={handleBinClick} 
                 isTarget={state.current.selectedUid && ui.items.find(i=>i.uid===state.current.selectedUid)}
                 shake={ui.bossTrait === 'glitch'}
+                float={ui.bossTrait === 'flood'}
               />
             </div>
           ))}
@@ -1434,6 +1798,74 @@ export default function App() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* --- REGULATION POPUP --- */}
+        {ui.showRegulation && ui.currentRegulation && (
+            <div className="absolute inset-0 bg-slate-900/95 z-[60] flex flex-col items-center justify-center p-6 animate-fadeIn text-center">
+                <div className="bg-slate-800 p-8 rounded-2xl border-2 border-slate-700 max-w-sm w-full shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-blue-500"></div>
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="bg-slate-700 p-3 rounded-full"><FileText size={32} className="text-emerald-400"/></div>
+                        <div>
+                            <div className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase mb-1">MUNICIPAL ALERT • WAVE {ui.wave}</div>
+                            <h2 className="text-2xl font-black text-white leading-tight mb-4">{ui.currentRegulation.title}</h2>
+                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 mb-4">
+                                <p className="text-xs text-slate-300 italic leading-relaxed">"{ui.currentRegulation.fact}"</p>
+                            </div>
+                            <div className="text-left bg-emerald-900/20 p-4 rounded-xl border border-emerald-500/30">
+                                <div className="text-[10px] font-bold text-emerald-500 uppercase mb-1">NEW REGULATION</div>
+                                <p className="text-sm font-bold text-emerald-100">{ui.currentRegulation.rule}</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                playSound('click');
+                                // SECURE TIMER UPDATE
+                                if (ui.cheatBossTime) {
+                                    state.current.bossTimer = parseFloat(ui.cheatBossTime);
+                                }
+                                state.current.showRegulation = false; // Updates ref for loop
+                                setUi(p => ({...p, showRegulation: false}));
+                                state.current.lastTime = performance.now(); // Reset timer to prevent jump
+                            }}
+                            className="w-full bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg mt-2 active:scale-95 transition-transform"
+                        >
+                            I COMPLY
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- VICTORY SCREEN --- */}
+        {ui.gameWon && (
+            <div className="absolute inset-0 bg-emerald-900/95 z-[60] flex flex-col items-center justify-center p-6 animate-fadeIn text-center text-white">
+                <CheckCircle size={64} className="text-emerald-400 mb-4" />
+                <h2 className="text-5xl font-black mb-2">CITY SAVED</h2>
+                <p className="text-emerald-200 mb-8 max-w-xs">You prevented the flood and cleared the clog. The city's drainage system is operational.</p>
+                
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                    <button 
+                         onClick={() => {
+                             playSound('click');
+                             state.current.endlessMode = true;
+                             state.current.gameWon = false;
+                             setUi(p => ({...p, gameWon: false, endlessMode: true}));
+                             openShop();
+                         }}
+                         className="bg-white text-emerald-900 font-black py-4 rounded-xl shadow-xl active:scale-95 transition-transform"
+                    >
+                        CONTINUE (ENDLESS)
+                    </button>
+                    <button 
+                         onClick={() => setUi(p => ({...p, gameWon: false, menu: 'start'}))}
+                         className="bg-emerald-800 text-emerald-200 font-bold py-4 rounded-xl active:scale-95 transition-transform"
+                    >
+                        RETIRE (MAIN MENU)
+                    </button>
+                </div>
+            </div>
         )}
 
         {ui.menu === 'paused' && (
@@ -1639,7 +2071,7 @@ export default function App() {
               <div>
                 <label className="text-xs uppercase opacity-70">Force Next Boss</label>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {['random', 'glitch', 'rush', 'phantom', 'iron', 'acid', 'quantum', 'swarm', 'sniper', 'gambler', 'mimic', 'freezer'].map(t => (
+                  {['random', 'flood', 'glitch', 'rush', 'phantom', 'iron', 'acid', 'quantum', 'swarm', 'sniper', 'gambler', 'mimic', 'freezer'].map(t => (
                     <button 
                       key={t}
                       onClick={() => setUi(p=>({...p, forceBoss: t}))}
@@ -1664,9 +2096,9 @@ export default function App() {
         )}
 
         {ui.menu === 'guide' && (
-          <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col text-white overflow-hidden animate-slide-up">
-            <div className="flex bg-slate-900 p-2 gap-2 overflow-x-auto shrink-0 border-b border-slate-800">
-              {['basics', 'economy', 'bestiary', 'hazards', 'perks', 'catalog', 'secrets'].map(tab => (
+          <div className="absolute inset-0 bg-slate-950 z-[100] flex flex-col text-white overflow-hidden animate-slide-up pointer-events-auto">
+            <div className="flex bg-slate-900 p-2 gap-2 overflow-x-auto shrink-0 border-b border-slate-800 pointer-events-auto">
+              {['basics', 'economy', 'bestiary', 'regulations', 'hazards', 'perks', 'catalog', 'secrets'].map(tab => (
                 <button 
                   key={tab}
                   onClick={() => setUi(p=>({...p, guideTab: tab}))}
@@ -1677,7 +2109,7 @@ export default function App() {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 pb-24">
+            <div className="flex-1 overflow-y-auto p-6 pb-24 pointer-events-auto">
               
               {ui.guideTab === 'basics' && (
                 <div className="space-y-6">
@@ -1776,6 +2208,26 @@ export default function App() {
                 </div>
               )}
 
+              {ui.guideTab === 'regulations' && (
+                 <div className="space-y-6">
+                    <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-blue-500">CIVIC MANDATES</h2>
+                    <p className="text-xs text-slate-400">New laws are enacted every wave. You must adapt your sorting strategy or face penalties.</p>
+                    
+                    <div className="space-y-4">
+                       {Object.values(REGULATIONS).map((reg, idx) => (
+                          <div key={idx} className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                             <div className="flex justify-between items-center mb-1">
+                                <h3 className="font-bold text-emerald-200">{reg.title}</h3>
+                                <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded">WAVE {idx + 1}</span>
+                             </div>
+                             <p className="text-xs text-slate-300 mb-2">{reg.rule}</p>
+                             <div className="bg-slate-950 p-2 rounded text-[10px] text-slate-500 italic">"{reg.fact}"</div>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              )}
+
               {ui.guideTab === 'bestiary' && (
                 <div className="space-y-6">
                   <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">BESTIARY</h2>
@@ -1784,6 +2236,7 @@ export default function App() {
                   <div className="space-y-4">
                     {[
                       { name: 'Trash Titan', desc: 'The standard boss. High HP, balanced attacks.', diff: 'Easy' },
+                      { name: 'The Clog', desc: 'Final Boss of the Civic Update. Causes urban flooding. Water rises if you miss items. Defeat it to save the city.', diff: 'FINAL' },
                       { name: 'Glitch Prime', desc: 'Disrupts reality. Shuffles your bin positions randomly.', diff: 'Medium' },
                       { name: 'Speed Demon', desc: 'Attacks at 2x speed. Requires rhythm.', diff: 'Hard' },
                       { name: 'The Phantom', desc: 'Attacks flicker in and out of visibility.', diff: 'Hard' },
@@ -1825,7 +2278,7 @@ export default function App() {
                       <div className="text-3xl">🧪</div>
                       <div>
                         <h3 className="font-bold text-yellow-400 mb-1">Acid Vials</h3>
-                        <p className="text-xs text-slate-300">Dropped by Acidify. Must be collected to damage the boss, but they linger in your inventory as a debuff (-3% Cash). <strong>DELETE</strong> them manually in the Resources tab after the fight.</p>
+                        <p className="text-xs text-slate-300">Dropped by Acidify or Leaking Batteries (Wave 3). Permanently reduce your Shield Max Capacity.</p>
                       </div>
                     </div>
                   </div>
@@ -1880,12 +2333,12 @@ export default function App() {
 
             </div>
             
-            <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="absolute bottom-6 left-6 right-6 bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg">BACK TO MENU</button>
+            <button onClick={() => setUi(p=>({...p, menu: 'start'}))} className="absolute bottom-6 left-6 right-6 bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg pointer-events-auto">BACK TO MENU</button>
           </div>
         )}
 
         {ui.menu === 'inventory' && (
-          <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 animate-slide-up text-slate-900">
+          <div className="absolute inset-0 z-[70] flex flex-col bg-slate-100 animate-slide-up text-slate-900">
             
             <div className="bg-white p-4 shadow-sm flex justify-between items-center z-10 sticky top-0">
               <div className="flex gap-4 items-center">
@@ -2065,9 +2518,23 @@ export default function App() {
               <button 
                 onClick={() => {
                   playSound('click');
-                  state.current.lastTime = performance.now(); 
-                  state.current.shopOpen = false;
-                  setUi(p => ({...p, shopOpen: false}));
+                  const nextReg = REGULATIONS[state.current.wave] || null;
+                  
+                  // SECURE TIMER UPDATE ON START WAVE
+                  if (ui.cheatBossTime) {
+                      state.current.bossTimer = parseFloat(ui.cheatBossTime);
+                  }
+
+                  if (nextReg && !state.current.endlessMode) {
+                      state.current.regulation = nextReg;
+                      state.current.shopOpen = false;
+                      state.current.showRegulation = true; // Updates loop state
+                      setUi(p => ({...p, shopOpen: false, showRegulation: true, currentRegulation: nextReg }));
+                  } else {
+                      state.current.lastTime = performance.now(); 
+                      state.current.shopOpen = false;
+                      setUi(p => ({...p, shopOpen: false}));
+                  }
                 }}
                 className="flex-[2] bg-emerald-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-emerald-400 active:scale-95 transition-all"
               >
@@ -2079,9 +2546,19 @@ export default function App() {
 
         {ui.gameOver && (
           <div className="absolute inset-0 bg-red-950/95 z-50 flex flex-col items-center justify-center p-8 backdrop-blur text-white animate-pulse-slow">
-             <Skull size={64} className="text-red-500 mb-4" />
-             <h2 className="text-5xl font-black mb-2 tracking-tighter">BANKRUPT</h2>
-             <p className="text-red-200 mb-8 font-mono text-sm">Debt Limit ({ui.bankruptcyLimit})</p>
+             {ui.gameLostByFlood ? (
+                 <>
+                    <div className="text-blue-400 mb-4 animate-bounce"><Droplet size={64} /></div>
+                    <h2 className="text-5xl font-black mb-2 tracking-tighter">CITY FLOODED</h2>
+                    <p className="text-blue-200 mb-8 font-mono text-sm text-center max-w-xs">The drainage system failed due to excess waste accumulation.</p>
+                 </>
+             ) : (
+                 <>
+                    <Skull size={64} className="text-red-500 mb-4" />
+                    <h2 className="text-5xl font-black mb-2 tracking-tighter">BANKRUPT</h2>
+                    <p className="text-red-200 mb-8 font-mono text-sm">Debt Limit ({ui.bankruptcyLimit})</p>
+                 </>
+             )}
 
              <div className="bg-red-900/30 p-6 rounded-2xl w-full border border-red-800 mb-8 grid grid-cols-2 gap-4 text-center">
                <div>
@@ -2109,3 +2586,5 @@ export default function App() {
     </div>
   );
 }
+
+
